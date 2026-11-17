@@ -2,7 +2,7 @@
 Módulo de binarización, máscara facial y segmentación por componentes conexos con 8-vecinos.
 Incluye verificación matemática y empírica de conectividad 8 vs 4 en diagonales.
 """
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 import cv2
 import numpy as np
 
@@ -38,7 +38,7 @@ def generar_mascara_binaria(
 
 def aislar_componente_mayor_8vecinos(
     mascara_binaria: np.ndarray
-) -> Tuple[np.ndarray, Dict[str, any]]:
+) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     Aplica componentes conexos con conectividad de 8 vecinos para aislar la
     región de primer plano mayoritaria (eliminando ruido o artefactos aislados).
@@ -79,7 +79,7 @@ def aislar_componente_mayor_8vecinos(
     return mascara_resultado, metadatos
 
 
-def verificar_conectividad_8_vs_4() -> Dict[str, any]:
+def verificar_conectividad_8_vs_4() -> Dict[str, Any]:
     """
     Demostración experimental de conectividad en una máscara 3x3 sintética:
     M = [[1, 0, 0],

@@ -12,11 +12,14 @@ dependencies = [
     "numpy",
     "scipy",
     "scikit-learn",
-    "opencv-python",
+    "opencv-python>=4.5.4,<5",
     "matplotlib",
     "pillow",
     "flask"
 ]
+
+[project.optional-dependencies]
+redes = ["torch>=2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

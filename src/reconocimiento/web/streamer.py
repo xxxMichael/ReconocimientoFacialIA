@@ -26,7 +26,7 @@ from reconocimiento.adquisicion.propio import (
     POSES_VALIDAS,
     PARTICIONES_VALIDAS
 )
-from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion
+from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion, ResultadoDeteccion
 from reconocimiento.preprocesamiento.normalizador import (
     a_escala_de_grises,
     normalizar_resolucion,

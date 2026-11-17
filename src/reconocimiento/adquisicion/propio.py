@@ -8,7 +8,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 POSES_VALIDAS = {"frontal", "izquierda", "derecha", "arriba", "abajo"}
@@ -326,7 +326,7 @@ class ManifiestoDataset:
 
         return (len(errores) == 0, errores)
 
-    def resumen_conteo(self) -> Dict[str, any]:
+    def resumen_conteo(self) -> Dict[str, Any]:
         """Genera conteo de muestras por persona, sesión, pose y partición."""
         por_particion = {"entrenamiento": 0, "validacion": 0, "prueba": 0}
         por_persona: Dict[str, int] = {}

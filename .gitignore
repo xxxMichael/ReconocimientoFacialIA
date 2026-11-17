@@ -1,6 +1,9 @@
 # Fuentes, recursos web, detector y
 *
 !/.gitignore
+!/.github/
+!/.github/workflows/
+!/.github/workflows/compatibilidad.yml
 !/README.md
 !/pyproject.toml
 !/reconocimiento/

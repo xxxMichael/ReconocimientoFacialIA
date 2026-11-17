@@ -4,12 +4,14 @@ Interfaz web local para capturar y revisar fotos de un proyecto universitario. C
 
 ## Primera instalación en Windows
 
-Abre PowerShell en la carpeta del proyecto. Con Python instalado, ejecuta:
+Abre PowerShell en la carpeta del proyecto con Python 3.9 o posterior de 64 bits. Para crear el entorno y obtener las dependencias compatibles con tu intérprete, ejecuta:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 ```
+
+Si ya tienes el entorno, repite solo el segundo comando después de actualizar el repositorio. Para cargar un modelo neuronal local, instala el extra opcional con `.\.venv\Scripts\python.exe -m pip install -e ".[redes]"`.
 
 ## Abrir la interfaz web
 

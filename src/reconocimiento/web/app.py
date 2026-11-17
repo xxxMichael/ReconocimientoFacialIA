@@ -57,7 +57,7 @@ def crear_app(indice_inicial: int = 1) -> Flask:
                         val_u = info_sel.get("umbral_congelado", info_sel.get("umbral", 0.65))
                     umbral_mod = float(val_u)
                     res_load = gestor.cargar_modelo(directorio_modelo=dir_mod, umbral=umbral_mod)
-                    modelo_cargado_exitosamente = True
+                    modelo_cargado_exitosamente = res_load.get("status") == "ok"
                     print(f"[RECONOCIMIENTO] Modelo seleccionado por validación: {modelo_elegido.upper()} "
                           f"(Val Acc: {info_sel.get('exactitud_validacion_pct')}%, Umbral: {umbral_mod*100:.0f}%) -> {res_load.get('mensaje')}")
         except Exception as e_load_sel:

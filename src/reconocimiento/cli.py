@@ -7,7 +7,7 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -333,7 +333,7 @@ def comando_ejecutar(args: argparse.Namespace) -> int:
         detecciones_exitosas = 0
         fallos_deteccion = 0
 
-        trazabilidad_muestras: Dict[str, Dict[str, any]] = {}
+        trazabilidad_muestras: Dict[str, Dict[str, Any]] = {}
 
         for r in manifiesto.registros:
             total_procesadas += 1
