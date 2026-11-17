@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adquisición Facial - Reconocimiento Facial IA</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-container">
+      <div class="header-brand">
+        <h1>Sistema de Reconocimiento Facial</h1>
+        <span class="header-subtitle">Panel Web de Adquisición y Control de Acceso</span>
+      </div>
+
+      <!-- Pestañas Principales: Captura vs Revisar Capturas -->
+      <div class="header-nav-tabs">
+        <button type="button" id="tab-nav-camara" class="btn-nav-tab active">
+          📸 Captura y Acceso
+        </button>
+        <button type="button" id="tab-nav-revision" class="btn-nav-tab">
+          🔍 Revisar Capturas
+        </button>
+      </div>
+
+      <!-- Selector de Vista: Entrenamiento / Registro vs Producción / Acceso -->
+      <div class="mode-switch-group" id="mode-switch-group">
+        <span class="mode-switch-label">Vista Activa:</span>
+        <div class="mode-toggle-pills">
+          <button type="button" id="btn-modo-entrenamiento" class="btn-toggle-pill active" title="Registrar rostros para entrenamiento">
+            📸 Modo Entrenamiento (Registro)
+          </button>
+          <button type="button" id="btn-modo-produccion" class="btn-toggle-pill" title="Probar simulación de apertura de puerta">
+            🚪 Modo Producción (Acceso)
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-layout mode-entrenamiento" id="main-layout">
+    <!-- Panel Izquierdo: Vista Previa y Monitor de Video -->
+    <section class="card video-section" id="video-section">
+      <div class="card-header">
+        <h2>Vista Previa en Vivo</h2>
+        <div class="badge-group">
+          <span id="badge-conexion" class="badge badge-desconectado">Desconectado</span>
+          <span id="badge-detector" class="badge badge-sin-rostro">SIN_ROSTRO</span>
+          <span id="badge-fps" class="badge badge-info">0.0 FPS</span>
+        </div>
+      </div>
+
+      <div class="video-container" id="video-container">
+        <img id="video-stream" src="" alt="Flujo de Video en Espera" class="video-display">
+        <div id="video-overlay-msg" class="video-overlay-msg">
+          <p id="overlay-text">Iniciando cámara...</p>
+        </div>
+      </div>
+
+      <div class="camera-toolbar">
+        <div class="form-row-inline">
+          <label for="select-camara">Dispositivo:</label>
+          <select id="select-camara" class="form-control-inline">
+            <option value="1">Cargando cámaras...</option>
+          </select>
+          <button id="btn-sondear" class="btn btn-secondary btn-sm" title="Sondear cámaras disponibles">Sondear</button>
+        </div>
+
+        <div class="btn-group-right">
+          <button id="btn-iniciar-cam" class="btn btn-primary btn-sm">Iniciar Cámara</button>
+          <button id="btn-detener-cam" class="btn btn-secondary btn-sm">Detener Cámara</button>
+        </div>
+      </div>
+
+      <div class="latency-info">
+        <span>Fotograma en pantalla: <strong id="lbl-frame-id">#0</strong></span>
+        <span>Resolución: <strong id="lbl-resolucion">640x480</strong></span>
+        <span>Rostros detectados: <strong id="lbl-total-rostros">0</strong></span>
+      </div>
+    </section>
+
+    <!-- Panel de Control de Acceso y Simulación de Puerta (Visible en Modo Producción) -->
+    <section class="card access-section" id="access-section">
+      <div class="card-header">
+        <h2>Simulación de Puerta de Acceso</h2>
+        <span id="badge-puerta" class="badge badge-door-closed">PUERTA CERRADA</span>
+      </div>
+      <div class="access-dashboard">
+        <div class="door-visual-box" id="door-visual-box">
+          <div class="door-graphic door-closed" id="door-graphic">
+            <span class="door-icon" id="door-icon">🔒</span>
+            <span class="door-state-text" id="door-state-text">CERRADA</span>
+          </div>
+          <div class="door-meta">
+            <div class="access-msg" id="access-msg">Puerta Cerrada (Esperando persona...)</div>
+            <div class="identity-badge-box">
+              <span>Sujeto Identificado: <strong id="lbl-persona-identificada">Ninguno</strong></span>
+              <span>Confianza: <strong id="lbl-confianza-reconocimiento">0.0%</strong></span>
+            </div>
+            <div class="confidence-bar-container">
+              <div class="confidence-bar" id="confidence-bar" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="model-control-panel">
+          <div class="form-row-inline">
+            <label for="select-modelo-recon">Modelo Activo:</label>
+            <select id="select-modelo-recon" class="form-control-inline">
+              <option value="cnn" selected>CNN (Red Convolucional - Recomendado)</option>
+              <option value="ann">ANN (Red Densa)</option>
+              <option value="svm">SVM (Máquina Vectores Soporte)</option>
+              <option value="arbol">Árbol de Decisión</option>
+              <option value="knn">KNN (K-Nearest Neighbors)</option>
+            </select>
+            <button id="btn-cambiar-modelo" class="btn btn-secondary btn-sm">Cargar</button>
+          </div>
+          <div class="form-row-inline" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+            <label for="slider-umbral">Regla de Rechazo (Umbral):</label>
+            <input type="range" id="slider-umbral" min="10" max="99" value="65" class="slider-control">
+            <span id="lbl-umbral-valor"><strong>65%</strong></span>
+          </div>
+          <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+            Si la confianza es inferior a este umbral o la persona es desconocida, la puerta permanece estrictamente <strong>CERRADA</strong>.
+          </small>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel de Adquisición y Captura (Visible en Modo Entrenamiento) -->
+    <section class="card controls-section" id="controls-section">
+      <div class="card-header">
+        <h2>Registro de Rostro</h2>
+        <span class="mode-tag" id="mode-tag">Sesión Real</span>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN DE CAPTURA PRINCIPALES: Al lado del recuadro de la cámara -->
+      <div class="capture-actions-primary">
+        <button id="btn-captura-valida" class="btn btn-success btn-xl" disabled title="Presiona para guardar o usa la tecla [Espacio]">
+          <span class="btn-icon">📸</span>
+          <div class="btn-text-block">
+            <span class="btn-main-text">Guardar Captura Válida</span>
+            <small class="btn-subtext">Atajo: [Espacio] | Requiere UN_ROSTRO verde</small>
+          </div>
+        </button>
+
+        <button id="btn-captura-fallo" class="btn btn-warning btn-md" disabled title="Registra cuando el detector pierde el rostro por rotación">
+          <span class="btn-icon">⚠</span>
+          <div class="btn-text-block">
+            <span class="btn-main-text">Registrar Fallo de Detección</span>
+            <small class="btn-subtext">Mide límites de pose (SIN_ROSTRO)</small>
+          </div>
+        </button>
+      </div>
+
+      <!-- Mensajes de Notificación -->
+      <div id="alert-banner" class="alert-banner hidden">
+        <span id="alert-msg"></span>
+      </div>
+
+      <!-- Selector de Pose -->
+      <div class="form-group pose-selection-block">
+        <div class="pose-header-row">
+          <label class="form-label-compact">Pose a Capturar:</label>
+          <span class="pose-hint-note">Girar desde tu perspectiva</span>
+        </div>
+        <div class="pose-buttons" id="pose-buttons-container">
+          <button type="button" class="btn-pose active" data-pose="frontal">Frontal</button>
+          <button type="button" class="btn-pose" data-pose="izquierda">Izquierda (Sujeto)</button>
+          <button type="button" class="btn-pose" data-pose="derecha">Derecha (Sujeto)</button>
+          <button type="button" class="btn-pose" data-pose="arriba">Arriba</button>
+          <button type="button" class="btn-pose" data-pose="abajo">Abajo</button>
+        </div>
+      </div>
+
+      <!-- Configuración de Sesión y Sujeto -->
+      <div class="form-grid-compact">
+        <div class="form-group-compact">
+          <label for="select-persona">Persona:</label>
+          <select id="select-persona" class="form-control-compact">
+            <option value="persona_1">persona_1</option>
+            <option value="persona_2">persona_2</option>
+            <option value="persona_3">persona_3</option>
+          </select>
+        </div>
+
+        <div class="form-group-compact">
+          <label for="select-sesion">Sesión:</label>
+          <select id="select-sesion" class="form-control-compact">
+            <option value="sesion_01" selected>sesion_01 (Entrenamiento)</option>
+            <option value="sesion_02">sesion_02 (Entrenamiento)</option>
+            <option value="sesion_03">sesion_03 (Entrenamiento)</option>
+            <option value="sesion_04">sesion_04 (Validación)</option>
+            <option value="sesion_05">sesion_05 (Prueba)</option>
+          </select>
+        </div>
+
+        <div class="form-group-compact">
+          <label for="select-tipo-sujeto">Tipo:</label>
+          <select id="select-tipo-sujeto" class="form-control-compact">
+            <option value="autorizado" selected>autorizado</option>
+            <option value="desconocido">desconocido</option>
+          </select>
+        </div>
+
+        <div class="form-group-compact">
+          <label for="select-particion">Partición:</label>
+          <select id="select-particion" class="form-control-compact">
+            <option value="entrenamiento" selected>entrenamiento</option>
+            <option value="validacion">validacion</option>
+            <option value="prueba">prueba</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Selector de Modo de Entorno: Ensayo vs Real -->
+      <div class="mode-selector-inline">
+        <span class="mode-label-inline">Almacenamiento:</span>
+        <div class="radio-pills-compact">
+          <label class="radio-pill-compact" id="label-ensayo">
+            <input type="radio" name="modo_entorno" value="ensayo" id="radio-ensayo">
+            <span>Ensayo (data/ensayos/)</span>
+          </label>
+          <label class="radio-pill-compact active" id="label-real">
+            <input type="radio" name="modo_entorno" value="real" id="radio-real" checked>
+            <span>Sesión Real (data/propio/)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Consentimiento implícito (activo de forma transparente) -->
+      <input type="hidden" id="chk-consentimiento" checked>
+
+      <!-- Progreso de la sesión integrado directamente al lado del video -->
+      <div class="session-progress-compact">
+        <div class="progress-header-compact">
+          <span>Progreso: <strong id="lbl-sesion-actual">sesion_01</strong> (<strong id="lbl-persona-actual">persona_1</strong>)</span>
+          <span class="progress-goal">Meta: 4 por pose | Fallos: <strong id="lbl-fallos-sesion">0</strong></span>
+        </div>
+        <div class="poses-progress-grid" id="poses-progress-container">
+          <!-- Tarjetas dinámicas generadas por JS -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- =========================================================================
+       MODAL DE INSPECCIÓN DE FOTOGRAMA CONGELADO (REQUISITO 4)
+       ========================================================================= -->
+  <div id="modal-congelar" class="modal-overlay hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>Inspección de Fotograma Congelado</h3>
+          <small style="color: var(--text-muted);">
+            Verifica el recorte exacto antes de confirmar. Puedes ajustar el recuadro si cayó sobre ropa o pelo.
+          </small>
+        </div>
+        <button type="button" id="btn-congelar-cerrar-x" class="btn btn-sm btn-secondary" style="font-size: 1.1rem; line-height: 1;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="frozen-comparison-grid">
+          <div class="frozen-canvas-box" id="frozen-canvas-wrapper">
+            <canvas id="canvas-congelado"></canvas>
+          </div>
+          <div class="frozen-sidebar-box">
+            <div class="crop-preview-card">
+              <h4>Recorte Exacto (Clasificador)</h4>
+              <img id="img-congelada-recorte" src="" alt="Recorte Clasificador" class="crop-preview-img">
+              <small style="color: var(--text-muted); display: block; margin-top: 6px;">
+                Región 1:1 con margen seguro y padding reflectante.
+              </small>
+            </div>
+            <div class="frozen-meta-details">
+              <div>Fotograma: <strong id="lbl-congelado-frame">#0</strong></div>
+              <div>Estado Detector: <strong id="lbl-congelado-estado">UN_ROSTRO</strong></div>
+              <div>Pose: <strong id="lbl-congelado-pose">frontal</strong></div>
+              <div>Sujeto: <strong id="lbl-congelado-persona">persona_1</strong></div>
+              <div id="lbl-congelado-aviso-dibujo" style="color: var(--color-warning); font-size: 0.8rem; display: none;">
+                ✏️ Modo corrección activo: arrastra sobre la foto para dibujar la caja correcta.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-congelar-descartar" class="btn btn-secondary">
+          🗑️ Descartar
+        </button>
+        <button type="button" id="btn-congelar-corregir" class="btn btn-warning">
+          ✏️ Recuadro Incorrecto (Ajustar)
+        </button>
+        <button type="button" id="btn-congelar-confirmar" class="btn btn-success btn-lg">
+          ✅ Confirmar y Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       PESTAÑA: REVISAR CAPTURAS (REQUISITOS 1, 2 Y 3)
+       ========================================================================= -->
+  <section id="revision-layout" class="revision-layout hidden">
+    <!-- Barra de Filtros -->
+    <div class="revision-filter-bar">
+      <div class="filter-item">
+        <label for="rev-filter-persona">Persona:</label>
+        <select id="rev-filter-persona" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="persona_1">persona_1</option>
+          <option value="persona_2">persona_2</option>
+          <option value="persona_3">persona_3</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-sesion">Sesión:</label>
+        <select id="rev-filter-sesion" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="sesion_01">sesion_01</option>
+          <option value="sesion_02">sesion_02</option>
+          <option value="sesion_03">sesion_03</option>
+          <option value="sesion_04">sesion_04</option>
+          <option value="sesion_05">sesion_05</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-pose">Pose:</label>
+        <select id="rev-filter-pose" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="frontal">frontal</option>
+          <option value="izquierda">izquierda</option>
+          <option value="derecha">derecha</option>
+          <option value="arriba">arriba</option>
+          <option value="abajo">abajo</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-particion">Partición:</label>
+        <select id="rev-filter-particion" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="entrenamiento">entrenamiento</option>
+          <option value="validacion">validacion</option>
+          <option value="prueba">prueba</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-decision">Decisión:</label>
+        <select id="rev-filter-decision" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="pendiente">⏳ Pendiente</option>
+          <option value="aprobada">✅ Aprobada</option>
+          <option value="corregida">✏️ Corregida</option>
+          <option value="excluida">❌ Excluida</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-entorno">Entorno:</label>
+        <select id="rev-filter-entorno" class="filter-select">
+          <option value="real" selected>Sesión Real (data/propio/)</option>
+          <option value="ensayo">Ensayo (data/ensayos/)</option>
+        </select>
+      </div>
+
+      <button type="button" id="btn-rev-recargar" class="btn btn-primary btn-sm" style="margin-left: auto;">
+        🔄 Filtrar / Recargar
+      </button>
+    </div>
+
+    <!-- Contenedor Principal: Lista Lateral + Panel de Inspección -->
+    <div class="revision-content-grid">
+      <!-- Lista Lateral -->
+      <aside class="revision-sidebar">
+        <div class="revision-list-header">
+          <span>Capturas (<span id="lbl-rev-total">0</span>)</span>
+          <span id="lbl-rev-resumen-estado">0 pendientes</span>
+        </div>
+        <div class="revision-items-scroll" id="rev-items-container">
+          <!-- Items generados dinámicamente -->
+        </div>
+      </aside>
+
+      <!-- Panel de Inspección y Decisión -->
+      <main class="revision-inspector" id="rev-inspector-panel">
+        <div class="inspector-header">
+          <div class="inspector-meta">
+            <h3 id="lbl-inspector-id">Selecciona una captura</h3>
+            <span id="badge-inspector-decision" class="badge-decision-pendiente">Pendiente</span>
+            <span id="badge-inspector-detector" class="badge badge-info">UN_ROSTRO</span>
+            <span id="badge-inspector-origen" class="badge badge-secondary">recalculada</span>
+          </div>
+          <div class="btn-group-nav">
+            <button type="button" id="btn-rev-anterior" class="btn btn-secondary btn-sm" disabled>⬅ Anterior</button>
+            <button type="button" id="btn-rev-siguiente" class="btn btn-secondary btn-sm" disabled>Siguiente ➡</button>
+          </div>
+        </div>
+
+        <!-- Banner de advertencia si la caja es recalculada -->
+        <div id="banner-rev-recalculada" class="banner-recalculada" style="display: none;">
+          ⚠️ <strong>Rótulo «recalculada»:</strong> Esta captura antigua no tenía recuadro almacenado. La caja fue recalculada con el nuevo detector multi-vista y puede diferir de la que apareció en vivo.
+        </div>
+
+        <div class="inspector-workspace">
+          <div class="inspector-canvas-container" id="inspector-canvas-wrapper">
+            <canvas id="canvas-inspector"></canvas>
+          </div>
+
+          <div class="inspector-side-panel">
+            <div class="crop-preview-card">
+              <h4>Recorte Exacto (Clasificador)</h4>
+              <img id="img-inspector-recorte" src="" alt="Recorte" class="crop-preview-img">
+              <small style="color: var(--text-muted); display: block; margin-top: 6px;">
+                Muestra exactamente lo que recibirá el pipeline de extracción y entrenamiento.
+              </small>
+            </div>
+
+            <div class="box-coords-form">
+              <strong>Coordenadas del Recuadro:</strong>
+              <div class="coords-grid">
+                <div class="coords-field">
+                  <label for="inp-box-x">X:</label>
+                  <input type="number" id="inp-box-x" min="0" value="0">
+                </div>
+                <div class="coords-field">
+                  <label for="inp-box-y">Y:</label>
+                  <input type="number" id="inp-box-y" min="0" value="0">
+                </div>
+                <div class="coords-field">
+                  <label for="inp-box-w">Ancho (W):</label>
+                  <input type="number" id="inp-box-w" min="1" value="0">
+                </div>
+                <div class="coords-field">
+                  <label for="inp-box-h">Alto (H):</label>
+                  <input type="number" id="inp-box-h" min="1" value="0">
+                </div>
+              </div>
+              <small style="color: var(--text-muted);">
+                Puedes editar los valores numéricos o hacer clic y arrastrar sobre la foto para dibujar la caja.
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Acciones de Decisión Humana -->
+        <div class="inspector-actions-bar">
+          <div style="font-size: 0.85rem; color: var(--text-muted);">
+            Preserva el original y el estado histórico. Solo capturas <strong>Aprobadas</strong> o <strong>Corregidas</strong> entrarán a entrenamiento.
+          </div>
+          <div class="decision-buttons-group">
+            <button type="button" id="btn-decidir-pendiente" class="btn btn-secondary">
+              ⏳ Pendiente
+            </button>
+            <button type="button" id="btn-decidir-excluir" class="btn btn-danger">
+              ❌ Excluir (Inutilizable)
+            </button>
+            <button type="button" id="btn-decidir-corregir" class="btn btn-primary">
+              ✏️ Corregir Recuadro
+            </button>
+            <button type="button" id="btn-decidir-aprobar" class="btn btn-success btn-lg">
+              ✅ Aprobar Recorte
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <p>Reconocimiento Facial IA — Adquisición y Acceso (DirectShow / DroidCam)</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

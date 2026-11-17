@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reconocimiento"
+version = "0.1.0"
+description = "Sistema universitario de reconocimiento facial e inteligencia artificial"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "opencv-python",
+    "matplotlib",
+    "pillow",
+    "flask"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
