@@ -7,6 +7,7 @@ y simulación de puerta abierta/cerrada, y almacena un búfer circular de fotogr
 import base64
 import collections
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import threading
@@ -24,8 +25,16 @@ from reconocimiento.adquisicion.propio import (
     ManifiestoDataset,
     RegistroCaptura,
     POSES_VALIDAS,
-    PARTICIONES_VALIDAS
+    PARTICIONES_VALIDAS,
+    TIPOS_SUJETO_VALIDOS,
+    DESTINOS_DESCONOCIDOS_VALIDOS,
+    DISTANCIAS_VALIDAS,
+    PERSONAS_AUTORIZADAS_PROPIO,
+    MAPEO_GRUPO_PARTICION_DESCONOCIDOS,
+    normalizar_identificador,
+    validar_coherencia_sesion_particion_propio
 )
+from reconocimiento.preprocesamiento.fabrica import crear_detector
 from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion, ResultadoDeteccion
 from reconocimiento.preprocesamiento.normalizador import (
     a_escala_de_grises,
@@ -39,7 +48,16 @@ from reconocimiento.clasificacion.arbol import ClasificadorArbol
 from reconocimiento.clasificacion.svm import ClasificadorSVM
 from reconocimiento.clasificacion.ann import ClasificadorANN
 from reconocimiento.clasificacion.cnn import ClasificadorCNN
-from reconocimiento.clasificacion.regla_acceso import evaluar_decision_acceso
+from reconocimiento.clasificacion.pipeline_candidato import (
+    PipelineCandidatoCongelado,
+    ErrorConfiguracionCandidato,
+)
+from reconocimiento.clasificacion.regla_acceso import (
+    es_valor_probabilidad_valido,
+    evaluar_decision_acceso,
+    evaluar_regla_acceso_completa,
+    validar_vector_probabilidades,
+)
 
 
 @dataclass
@@ -84,11 +102,14 @@ class GestorCamaraWeb:
         self._inicializado = True
         self.tamano_buffer = tamano_buffer
         self.buffer: collections.deque[FotogramaBuffer] = collections.deque(maxlen=tamano_buffer)
-        self.lock_buffer = threading.Lock()
+        self.lock_buffer = threading.RLock()
+        self.condicion_fotograma = threading.Condition(self.lock_buffer)
         self.lock_captura = threading.Lock()
+        self.lock_modelo = threading.RLock()
+        self.lock_inferencia = threading.RLock()
 
         self.capturador: Optional[CapturadorCamara] = None
-        self.detector = DetectorFacial()
+        self.detector = crear_detector()
         self.indice_activo: Optional[int] = None
 
         self.hilo_trabajador: Optional[threading.Thread] = None
@@ -103,26 +124,48 @@ class GestorCamaraWeb:
         # Caché de idempotencia (idempotency_key -> respuesta)
         self.cache_idempotencia: Dict[str, Dict[str, Any]] = {}
 
+        # Directorios base de datos (configurables para aislamiento de tests)
+        self.dir_propio: Path = Path("data/propio")
+        self.dir_ensayos: Path = Path("data/ensayos")
+
         # Módulo de reconocimiento facial y simulación de puerta
         self.modelo_reconocimiento: Optional[Any] = None
+        self.pipeline_candidato: Optional[PipelineCandidatoCongelado] = None
         self.extractor_caracteristicas = ExtractorHistogramasRegionales(cuadricula=(4, 4), n_bins=16, rango_intensidad=(0.0, 1.0))
         self.mapeo_clases: Dict[str, Any] = {
             "id_to_persona": {"0": "persona_1", "1": "persona_2", "2": "persona_3"},
             "persona_to_id": {"persona_1": 0, "persona_2": 1, "persona_3": 2},
             "personas_autorizadas": ["persona_1", "persona_2", "persona_3"]
         }
+        self.personas_autorizadas: List[str] = ["persona_1", "persona_2", "persona_3"]
         self.nombre_modelo_activo: str = "ninguno"
         self.es_cnn: bool = False
         self.umbral_confianza: float = 0.65
         self.ultimo_resultado_reconocimiento: Dict[str, Any] = {
             "estado_puerta": "CERRADA",
-            "persona_reconocida": "",
+            "persona_reconocida": "DESCONOCIDO",
             "confianza": 0.0,
             "es_autorizado": False,
             "mensaje_acceso": "Puerta Cerrada (Esperando rostro)",
             "modelo_activo": "ninguno",
             "umbral": 65.0
         }
+
+    def _obtener_instantanea_modelo(self) -> Dict[str, Any]:
+        """Retorna una instantánea coherente del detector, preprocesamiento, modelo y umbral activos."""
+        with self.lock_modelo:
+            pipe = self.pipeline_candidato
+            detector_activo = pipe.detector if pipe is not None else self.detector
+            return {
+                "pipeline_candidato": pipe,
+                "detector": detector_activo,
+                "modelo_reconocimiento": self.modelo_reconocimiento,
+                "es_cnn": self.es_cnn,
+                "umbral_confianza": self.umbral_confianza,
+                "personas_autorizadas": list(self.personas_autorizadas),
+                "mapeo_clases": dict(self.mapeo_clases),
+                "nombre_modelo_activo": self.nombre_modelo_activo,
+            }
 
     def cargar_modelo(self, directorio_modelo: Path = Path("resultados/cnn_propio"), umbral: float = 0.65) -> Dict[str, Any]:
         """
@@ -133,14 +176,31 @@ class GestorCamaraWeb:
         if not directorio_modelo.exists():
             return {"status": "error", "mensaje": f"No existe el directorio de modelo: {directorio_modelo}"}
 
-        # Cargar mapeo de clases si existe
+        with self.lock_modelo:
+            self.pipeline_candidato = None
+            # Cargar mapeo de clases si existe
         ruta_mapeo = directorio_modelo / "clases_mapeo.json"
         if ruta_mapeo.exists():
             try:
                 with open(ruta_mapeo, "r", encoding="utf-8") as f:
-                    self.mapeo_clases = json.load(f)
+                    map_data = json.load(f)
+                    if "id_to_persona" in map_data:
+                        self.mapeo_clases = map_data
+                    else:
+                        self.mapeo_clases = {"id_to_persona": map_data}
             except Exception as e:
                 print(f"Aviso al cargar clases_mapeo.json: {e}")
+
+        # Cargar personas autorizadas si existe archivo separado
+        ruta_aut = directorio_modelo / "personas_autorizadas.json"
+        if ruta_aut.exists():
+            try:
+                with open(ruta_aut, "r", encoding="utf-8") as f:
+                    self.personas_autorizadas = json.load(f)
+            except Exception as e:
+                print(f"Aviso al cargar personas_autorizadas.json: {e}")
+        elif "personas_autorizadas" in self.mapeo_clases:
+            self.personas_autorizadas = list(self.mapeo_clases["personas_autorizadas"])
 
         self.umbral_confianza = float(umbral)
         nombre_dir = directorio_modelo.name.lower()
@@ -193,10 +253,66 @@ class GestorCamaraWeb:
                 "es_cnn": self.es_cnn,
                 "umbral": round(self.umbral_confianza * 100, 1),
                 "umbral_decimal": round(self.umbral_confianza, 4),
-                "personas_autorizadas": self.mapeo_clases.get("personas_autorizadas", [])
+                "personas_autorizadas": self.personas_autorizadas
             }
         except Exception as e:
             return {"status": "error", "mensaje": f"Fallo al cargar modelo: {e}"}
+
+    def cargar_desde_configuracion_congelada(self, ruta_config: Path) -> Dict[str, Any]:
+        """
+        Carga explícitamente el modelo y parámetros del candidato desde un archivo
+        de configuración congelada utilizando el pipeline canónico unificado,
+        validando hashes SHA-256 de pesos y detector, y verificando coherencia de clases.
+        """
+        ruta_config = Path(ruta_config)
+        if not ruta_config.exists():
+            self._reiniciar_estado_reconocimiento_bloqueado(f"No existe el archivo de configuración: {ruta_config}")
+            return {"status": "error", "mensaje": f"No existe el archivo de configuración: {ruta_config}"}
+
+        try:
+            pipeline = PipelineCandidatoCongelado(ruta_config)
+            with self.lock_modelo:
+                self.pipeline_candidato = pipeline
+                self.modelo_reconocimiento = pipeline.clasificador
+                self.detector = pipeline.detector
+                self.es_cnn = True
+                self.umbral_confianza = pipeline.umbral_score
+                self.personas_autorizadas = list(pipeline.personas_autorizadas)
+                self.mapeo_clases = {
+                    "id_to_persona": {str(k): v for k, v in pipeline.mapeo_id_clase.items()},
+                    "personas_autorizadas": list(pipeline.personas_autorizadas),
+                }
+                self.nombre_modelo_activo = f"{pipeline.nombre} (Candidato Congelado, th={self.umbral_confianza:.2f})"
+
+            with self.lock_buffer:
+                self.ultimo_resultado_reconocimiento = {
+                    "estado_puerta": "CERRADA",
+                    "persona_reconocida": "",
+                    "confianza": 0.0,
+                    "es_autorizado": False,
+                    "mensaje_acceso": "Puerta Cerrada (Candidato Congelado Cargado)",
+                    "modelo_activo": self.nombre_modelo_activo,
+                    "umbral": round(self.umbral_confianza * 100, 1),
+                }
+
+            return {
+                "status": "ok",
+                "mensaje": f"Candidato congelado '{self.nombre_modelo_activo}' cargado exitosamente.",
+                "modelo_activo": self.nombre_modelo_activo,
+                "es_cnn": True,
+                "umbral": round(self.umbral_confianza * 100, 1),
+                "umbral_decimal": round(self.umbral_confianza, 4),
+                "personas_autorizadas": self.personas_autorizadas,
+                "sha256": pipeline.sha256_modelo,
+            }
+        except Exception as e:
+            with self.lock_modelo:
+                self.modelo_reconocimiento = None
+                self.pipeline_candidato = None
+                self.es_cnn = False
+                self.nombre_modelo_activo = "ninguno"
+            self._reiniciar_estado_reconocimiento_bloqueado(f"Fallo al cargar candidato congelado: {e}")
+            return {"status": "error", "mensaje": f"Error al cargar candidato congelado: {e}"}
 
     def desactivar_modelo(self, motivo: str = "Autorización desactivada: sin modelo calibrado.") -> Dict[str, Any]:
         """
@@ -204,24 +320,31 @@ class GestorCamaraWeb:
         de puerta estrictamente CERRADA y la autorización inactiva.
         Permite que la captura y adquisición web sigan operando normalmente.
         """
-        self.modelo_reconocimiento = None
-        self.nombre_modelo_activo = "ninguno"
-        self.es_cnn = False
-        self.ultimo_resultado_reconocimiento = {
-            "estado_puerta": "CERRADA",
-            "persona_reconocida": "",
-            "confianza": 0.0,
-            "es_autorizado": False,
-            "mensaje_acceso": motivo,
-            "modelo_activo": "ninguno",
-            "umbral": round(self.umbral_confianza * 100, 1)
-        }
+        with self.lock_modelo:
+            self.modelo_reconocimiento = None
+            self.pipeline_candidato = None
+            self.nombre_modelo_activo = "ninguno"
+            self.es_cnn = False
+        with self.lock_buffer:
+            self.ultimo_resultado_reconocimiento = {
+                "estado_puerta": "CERRADA",
+                "persona_reconocida": "",
+                "confianza": 0.0,
+                "es_autorizado": False,
+                "mensaje_acceso": motivo,
+                "modelo_activo": "ninguno",
+                "umbral": round(self.umbral_confianza * 100, 1)
+            }
         return {"status": "ok", "mensaje": motivo, "modelo_activo": "ninguno"}
 
     def actualizar_umbral(self, nuevo_umbral: float) -> None:
         """Actualiza el umbral de confianza para la regla de rechazo."""
-        self.umbral_confianza = max(0.1, min(0.99, float(nuevo_umbral)))
-        self.ultimo_resultado_reconocimiento["umbral"] = round(self.umbral_confianza * 100, 1)
+        with self.lock_modelo:
+            self.umbral_confianza = max(0.1, min(0.99, float(nuevo_umbral)))
+            if self.pipeline_candidato is not None:
+                self.pipeline_candidato.umbral_score = self.umbral_confianza
+            with self.lock_buffer:
+                self.ultimo_resultado_reconocimiento["umbral"] = round(self.umbral_confianza * 100, 1)
 
     def iniciar(self, indice: int = 1, fuente_custom: Any = None) -> bool:
         """Inicia el hilo de captura en el índice especificado si no está ya activo."""
@@ -285,11 +408,11 @@ class GestorCamaraWeb:
             self.senal_perdida = False
             h_f, w_f = frame_raw.shape[:2]
 
-            # 1. Detección facial sobre el fotograma ORIGINAL
-            resultado_det = self.detector.detectar(frame_raw, es_pre_recortada=False)
-
-            # 2. Inferencia, HUD y almacenamiento en búfer
-            self._procesar_y_almacenar_fotograma(frame_raw, resultado_det)
+            # 1 y 2. Instantánea coherente de detector, preprocesamiento, modelo y umbral
+            snap = self._obtener_instantanea_modelo()
+            with self.lock_inferencia:
+                resultado_det = snap["detector"].detectar(frame_raw, es_pre_recortada=False)
+                self._procesar_y_almacenar_fotograma(frame_raw, resultado_det, snap=snap)
 
             elapsed = time.time() - t_inicio
             restante = target_period - elapsed
@@ -301,14 +424,25 @@ class GestorCamaraWeb:
     def _procesar_y_almacenar_fotograma(
         self,
         frame_raw: np.ndarray,
-        resultado_det: ResultadoDeteccion
+        resultado_det: ResultadoDeteccion,
+        snap: Optional[Dict[str, Any]] = None,
     ) -> Optional[FotogramaBuffer]:
         """
         Aplica reconocimiento facial y regla de rechazo al rostro detectado,
         renderiza el HUD y estado de la puerta, y publica el fotograma en el búfer circular.
         """
+        if snap is None:
+            snap = self._obtener_instantanea_modelo()
+        pipe_cand = snap["pipeline_candidato"]
+        modelo_rec = snap["modelo_reconocimiento"]
+        es_cnn_snap = snap["es_cnn"]
+        umbral_snap = snap["umbral_confianza"]
+        aut_snap = snap["personas_autorizadas"]
+        mapeo_snap = snap["mapeo_clases"]
+        nombre_mod_snap = snap["nombre_modelo_activo"]
+
         h_f, w_f = frame_raw.shape[:2]
-        persona_rec = ""
+        persona_rec = "DESCONOCIDO"
         confianza_rec = 0.0
         es_aut = False
         estado_puerta = "CERRADA"
@@ -316,43 +450,75 @@ class GestorCamaraWeb:
         color_recuadro = (0, 180, 255)
 
         if resultado_det.estado == EstadoDeteccion.UN_ROSTRO:
-            if self.modelo_reconocimiento is not None and resultado_det.rostro_recortado is not None:
+            if modelo_rec is not None and resultado_det.rostro_recortado is not None:
                 try:
-                    recorte = resultado_det.rostro_recortado
-                    gris = a_escala_de_grises(recorte) if len(recorte.shape) == 3 else recorte
-                    norm_res = normalizar_resolucion(gris, (64, 64))
-                    norm_int = normalizar_intensidades(norm_res, "float32_0_1")
-                    suavizada = suavizado_gaussiano(norm_int, sigma=0.5)
-
-                    if self.es_cnn:
-                        in_tensor = np.expand_dims(suavizada, axis=0)
-                        probs = self.modelo_reconocimiento.predecir_probabilidades(in_tensor)[0]
-                    else:
-                        rep = self.extractor_caracteristicas.extraer(suavizada)
-                        in_feat = np.expand_dims(rep.vector_caracteristicas, axis=0)
-                        probs = self.modelo_reconocimiento.predecir_probabilidades(in_feat)[0]
-
-                    pred_idx = int(np.argmax(probs))
-                    confianza_rec = float(probs[pred_idx])
-                    id_str = str(pred_idx)
-                    id_to_p = self.mapeo_clases.get("id_to_persona", {})
-                    nombre_pred = id_to_p.get(id_str, id_to_p.get(pred_idx, f"persona_{pred_idx}"))
-
-                    # REGLA CANÓNICA DE DECISIÓN DE ACCESO
-                    decision_acceso = evaluar_decision_acceso(
-                        nombre_predicho=nombre_pred,
-                        confianza=confianza_rec,
-                        umbral_confianza=self.umbral_confianza,
-                        personas_autorizadas=self.mapeo_clases.get("personas_autorizadas", []),
+                    usar_alin = getattr(pipe_cand, "usar_alineacion", False) if pipe_cand else False
+                    recorte = (
+                        resultado_det.recorte_alineado
+                        if (usar_alin and resultado_det.recorte_alineado is not None)
+                        else resultado_det.rostro_recortado
                     )
+                    if pipe_cand is not None:
+                        decision_acceso, probs = pipe_cand.evaluar_recorte(recorte)
+                        pred_idx = int(np.argmax(probs))
+                        confianza_rec = float(probs[pred_idx])
+                    else:
+                        gris = a_escala_de_grises(recorte) if len(recorte.shape) == 3 else recorte
+                        norm_res = normalizar_resolucion(gris, (64, 64))
+                        norm_int = normalizar_intensidades(norm_res, "float32_0_1")
+                        suavizada = suavizado_gaussiano(norm_int, sigma=0.5)
+
+                        if es_cnn_snap:
+                            in_tensor = np.expand_dims(suavizada, axis=0)
+                            probs = modelo_rec.predecir_probabilidades(in_tensor)[0]
+                        else:
+                            rep = self.extractor_caracteristicas.extraer(suavizada)
+                            in_feat = np.expand_dims(rep.vector_caracteristicas, axis=0)
+                            probs = modelo_rec.predecir_probabilidades(in_feat)[0]
+
+                        valido, mot = validar_vector_probabilidades(probs, n_clases_esperadas=len(probs))
+                        if not valido:
+                            raise ValueError(f"Probabilidades de salida inválidas: {mot}")
+
+                        pred_idx = int(np.argmax(probs))
+                        confianza_rec = float(probs[pred_idx])
+                        id_str = str(pred_idx)
+                        id_to_p = mapeo_snap.get("id_to_persona", mapeo_snap)
+                        nombre_pred = id_to_p.get(id_str, id_to_p.get(pred_idx, f"persona_{pred_idx}"))
+                        aut_list = aut_snap or mapeo_snap.get("personas_autorizadas", ["persona_1", "persona_2", "persona_3"])
+
+                        # REGLA CANÓNICA DE DECISIÓN DE ACCESO
+                        decision_acceso = evaluar_regla_acceso_completa(
+                            estado_deteccion="UN_ROSTRO",
+                            procesamiento_exitoso=True,
+                            clase_predicha=nombre_pred,
+                            score=confianza_rec,
+                            umbral=umbral_snap,
+                            personas_autorizadas=aut_list,
+                        )
+
                     es_aut = decision_acceso.es_autorizado
                     estado_puerta = decision_acceso.estado_puerta
                     persona_rec = decision_acceso.persona_identificada
                     msg_acceso = decision_acceso.mensaje
                     color_recuadro = (0, 255, 0) if es_aut else (0, 140, 255)
                 except Exception as e_inf:
-                    msg_acceso = f"Error inferencia: {e_inf}"
-                    color_recuadro = (0, 255, 255)
+                    aut_list = aut_snap or mapeo_snap.get("personas_autorizadas", ["persona_1", "persona_2", "persona_3"])
+                    decision_acceso = evaluar_regla_acceso_completa(
+                        estado_deteccion="UN_ROSTRO",
+                        procesamiento_exitoso=False,
+                        clase_predicha=None,
+                        score=0.0,
+                        umbral=umbral_snap,
+                        personas_autorizadas=aut_list,
+                        error_procesamiento=str(e_inf),
+                    )
+                    msg_acceso = decision_acceso.mensaje
+                    estado_puerta = decision_acceso.estado_puerta
+                    es_aut = False
+                    persona_rec = "DESCONOCIDO"
+                    confianza_rec = 0.0
+                    color_recuadro = (0, 0, 255)
             else:
                 color_recuadro = (0, 180, 255)
                 msg_acceso = "Rostro detectado (Autorización desactivada: sin modelo calibrado)"
@@ -364,20 +530,27 @@ class GestorCamaraWeb:
             color_recuadro = (0, 180, 255)
             msg_acceso = "Esperando persona..."
             estado_puerta = "CERRADA"
+            es_aut = False
+            persona_rec = ""
+            confianza_rec = 0.0
         else:  # VARIOS_ROSTROS
             color_recuadro = (0, 0, 255)
             msg_acceso = "Múltiples rostros detectados (Acceso Bloqueado)"
             estado_puerta = "CERRADA"
+            es_aut = False
+            persona_rec = ""
+            confianza_rec = 0.0
 
-        self.ultimo_resultado_reconocimiento = {
-            "estado_puerta": estado_puerta,
-            "persona_reconocida": persona_rec,
-            "confianza": round(confianza_rec * 100, 1),
-            "es_autorizado": es_aut,
-            "mensaje_acceso": msg_acceso,
-            "modelo_activo": self.nombre_modelo_activo,
-            "umbral": round(self.umbral_confianza * 100, 1)
-        }
+        with self.lock_buffer:
+            self.ultimo_resultado_reconocimiento = {
+                "estado_puerta": estado_puerta,
+                "persona_reconocida": persona_rec,
+                "confianza": round(confianza_rec * 100, 1),
+                "es_autorizado": es_aut,
+                "mensaje_acceso": msg_acceso,
+                "modelo_activo": nombre_mod_snap,
+                "umbral": round(umbral_snap * 100, 1)
+            }
 
         # 3. Dibujar visualización con HUD y estado de Puerta
         display = frame_raw.copy()
@@ -400,7 +573,7 @@ class GestorCamaraWeb:
         cv2.rectangle(display, (0, 0), (w_f, 26), (20, 20, 20), -1)
         cv2.putText(
             display,
-            f"DETECTOR: {resultado_det.estado.value} | MODELO: {self.nombre_modelo_activo} | FPS: {self.fps_efectivo:.1f}",
+            f"DETECTOR YuNet: {resultado_det.estado.value} | MODELO: {self.nombre_modelo_activo} | FPS: {self.fps_efectivo:.1f}",
             (8, 18),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.48,
@@ -454,26 +627,47 @@ class GestorCamaraWeb:
                 mensaje_acceso=msg_acceso
             )
             self.buffer.append(item)
+            self.condicion_fotograma.notify_all()
             return item
+
+    def procesar_fotograma_para_reconocimiento(
+        self,
+        frame_raw: np.ndarray,
+        resultado_det: Optional[ResultadoDeteccion] = None,
+    ) -> Dict[str, Any]:
+        """
+        Ejecuta síncronamente la detección (si no se proporciona) e inferencia
+        sobre un fotograma, actualizando de forma atómica el estado de reconocimiento y puerta.
+        Retorna el diccionario con el resultado de reconocimiento actualizado.
+        """
+        snap = self._obtener_instantanea_modelo()
+        with self.lock_inferencia:
+            if resultado_det is None:
+                resultado_det = snap["detector"].detectar(frame_raw, es_pre_recortada=False)
+            self._procesar_y_almacenar_fotograma(frame_raw, resultado_det, snap=snap)
+        with self.lock_buffer:
+            return dict(self.ultimo_resultado_reconocimiento)
 
     def _reiniciar_estado_reconocimiento_bloqueado(self, razon: str = "Cámara detenida (Acceso Bloqueado)") -> None:
         """Fuerza inmediatamente el bloqueo de la puerta y resetea las variables de reconocimiento."""
-        self.ultimo_resultado_reconocimiento = {
-            "estado_puerta": "CERRADA",
-            "persona_reconocida": "",
-            "confianza": 0.0,
-            "es_autorizado": False,
-            "mensaje_acceso": razon,
-            "modelo_activo": self.nombre_modelo_activo,
-            "umbral": round(self.umbral_confianza * 100, 1)
-        }
-        if self.buffer:
-            ultimo = self.buffer[-1]
-            ultimo.estado_puerta = "CERRADA"
-            ultimo.es_autorizado = False
-            ultimo.persona_reconocida = ""
-            ultimo.confianza = 0.0
-            ultimo.mensaje_acceso = razon
+        with self.lock_buffer:
+            self.ultimo_resultado_reconocimiento = {
+                "estado_puerta": "CERRADA",
+                "persona_reconocida": "",
+                "confianza": 0.0,
+                "es_autorizado": False,
+                "mensaje_acceso": razon,
+                "modelo_activo": self.nombre_modelo_activo,
+                "umbral": round(self.umbral_confianza * 100, 1)
+            }
+            if self.buffer:
+                ultimo = self.buffer[-1]
+                ultimo.estado_puerta = "CERRADA"
+                ultimo.es_autorizado = False
+                ultimo.persona_reconocida = "DESCONOCIDO"
+                ultimo.confianza = 0.0
+                ultimo.mensaje_acceso = razon
+            self.condicion_fotograma.notify_all()
 
     def _detener_sin_lock(self) -> None:
         """Detiene y libera recursos (debe llamarse con control de hilo)."""
@@ -499,13 +693,22 @@ class GestorCamaraWeb:
         with self.lock_buffer:
             if not self.buffer:
                 return None
-            item = self.buffer[-1]
-            # Si la cámara está detenida o sin señal, garantizar que la puerta permanezca CERRADA
-            if self.capturador is None or not self.capturador.esta_activo or self.detener_evento.is_set():
-                item.estado_puerta = "CERRADA"
-                item.es_autorizado = False
-                item.mensaje_acceso = "Cámara detenida (Acceso Bloqueado)"
-            return item
+            return self.buffer[-1]
+
+    def esperar_nuevo_fotograma(self, id_anterior: Optional[int] = None, timeout: float = 1.0) -> Optional[FotogramaBuffer]:
+        """Espera de forma sincronizada hasta que se procese y publique un fotograma nuevo en el búfer."""
+        with self.condicion_fotograma:
+            limite = time.time() + timeout
+            while time.time() < limite:
+                if self.buffer:
+                    ultimo = self.buffer[-1]
+                    if id_anterior is None or ultimo.id_fotograma > id_anterior:
+                        return ultimo
+                restante = limite - time.time()
+                if restante <= 0:
+                    break
+                self.condicion_fotograma.wait(timeout=min(0.05, restante))
+            return self.buffer[-1] if self.buffer else None
 
     def obtener_fotograma_por_id(self, id_fotograma: int) -> Optional[FotogramaBuffer]:
         """Busca y recupera un fotograma específico por su identificador en el búfer."""
@@ -522,6 +725,8 @@ class GestorCamaraWeb:
             if not activo:
                 self.ultimo_resultado_reconocimiento["estado_puerta"] = "CERRADA"
                 self.ultimo_resultado_reconocimiento["es_autorizado"] = False
+                self.ultimo_resultado_reconocimiento["persona_reconocida"] = "DESCONOCIDO"
+                self.ultimo_resultado_reconocimiento["confianza"] = 0.0
                 self.ultimo_resultado_reconocimiento["mensaje_acceso"] = "Cámara detenida (Acceso Bloqueado)"
             return {
                 "activa": activo,
@@ -547,7 +752,9 @@ class GestorCamaraWeb:
         idempotency_key: str = "",
         caja: Optional[List[int]] = None,
         decision: Optional[str] = None,
-        origen_caja: Optional[str] = None
+        origen_caja: Optional[str] = None,
+        grupo: Optional[str] = None,
+        distancia: Optional[str] = None
     ) -> Dict[str, Any]:
         """Procesa una solicitud de captura asociando el id_fotograma mostrado."""
         if idempotency_key and idempotency_key in self.cache_idempotencia:
@@ -560,11 +767,52 @@ class GestorCamaraWeb:
             if not consentimiento:
                 raise ValueError("Se requiere consentimiento informado explícito para registrar la captura.")
 
+            persona = normalizar_identificador(persona)
+            if not persona:
+                raise ValueError("El identificador de la persona no puede estar vacío.")
+
             if pose not in POSES_VALIDAS:
-                raise ValueError(f"Pose inválida: '{pose}'. Válidas: {list(POSES_VALIDAS)}")
+                raise ValueError(f"Pose inválida: '{pose}'. Válidas: {sorted(POSES_VALIDAS)}")
 
             if particion not in PARTICIONES_VALIDAS:
-                raise ValueError(f"Partición inválida: '{particion}'. Válidas: {list(PARTICIONES_VALIDAS)}")
+                raise ValueError(f"Partición inválida: '{particion}'. Válidas: {sorted(PARTICIONES_VALIDAS)}")
+
+            if tipo_sujeto not in TIPOS_SUJETO_VALIDOS:
+                raise ValueError(f"Tipo de sujeto '{tipo_sujeto}' inválido. Válidos: {sorted(TIPOS_SUJETO_VALIDOS)}")
+
+            if tipo_sujeto == "desconocido":
+                if persona in PERSONAS_AUTORIZADAS_PROPIO:
+                    raise ValueError(
+                        f"Conflicto de rol: La identidad '{persona}' es una persona autorizada y no puede registrarse como desconocido."
+                    )
+                if not grupo:
+                    raise ValueError("El grupo experimental es obligatorio para sujetos desconocidos.")
+                grupo = normalizar_identificador(grupo)
+                if grupo not in DESTINOS_DESCONOCIDOS_VALIDOS:
+                    raise ValueError(
+                        f"Grupo experimental '{grupo}' inválido. Opciones válidas: {sorted(DESTINOS_DESCONOCIDOS_VALIDOS)}"
+                    )
+                particion_esperada = MAPEO_GRUPO_PARTICION_DESCONOCIDOS[grupo]
+                if particion != particion_esperada:
+                    raise ValueError(
+                        f"Inconsistencia de partición: El grupo '{grupo}' debe corresponder a la partición '{particion_esperada}', pero se especificó '{particion}'."
+                    )
+                if not distancia:
+                    raise ValueError("La distancia de captura es obligatoria para sujetos desconocidos.")
+                distancia = normalizar_identificador(distancia)
+                if distancia not in DISTANCIAS_VALIDAS:
+                    raise ValueError(
+                        f"Distancia '{distancia}' inválida. Opciones válidas: {sorted(DISTANCIAS_VALIDAS)}"
+                    )
+            elif tipo_sujeto == "autorizado":
+                if not es_ensayo:
+                    es_val_proto, err_proto = validar_coherencia_sesion_particion_propio(sesion, particion)
+                    if not es_val_proto:
+                        raise ValueError(err_proto)
+                if grupo and grupo in DESTINOS_DESCONOCIDOS_VALIDOS:
+                    raise ValueError(f"Conflicto de rol: Un sujeto autorizado no puede asignarse a un grupo de desconocidos '{grupo}'.")
+                if distancia and distancia not in DISTANCIAS_VALIDAS:
+                    raise ValueError(f"Distancia '{distancia}' inválida. Opciones válidas: {sorted(DISTANCIAS_VALIDAS)}")
 
             item = self.obtener_fotograma_por_id(id_fotograma)
             if item is None:
@@ -588,18 +836,41 @@ class GestorCamaraWeb:
                 raise ValueError(f"Modo de captura desconocido: '{modo}'.")
 
             if es_ensayo:
-                dir_base = Path("data/ensayos")
+                dir_base = self.dir_ensayos
                 ruta_manifiesto = dir_base / "manifiesto_ensayo.csv"
                 prefijo_id = "ensayo"
             else:
-                dir_base = Path("data/propio")
+                dir_base = self.dir_propio
                 ruta_manifiesto = dir_base / "manifiesto.csv"
                 prefijo_id = sanitizar_componente_ruta(persona)
+
+            manifiesto = ManifiestoDataset(ruta_manifiesto)
+
+            # Validación preventiva contra el manifiesto existente antes de escribir cualquier archivo en disco
+            if tipo_sujeto == "desconocido":
+                for r in manifiesto.registros:
+                    if r.tipo_sujeto == "desconocido" and r.persona == persona:
+                        dest_existente = r.destino_experimental or r.particion
+                        if dest_existente != grupo:
+                            raise ValueError(
+                                f"Fuga de identidad externa: El voluntario desconocido '{persona}' ya está asignado "
+                                f"al grupo '{dest_existente}' y no puede registrarse en '{grupo}'. "
+                                f"Cada voluntario desconocido debe pertenecer a un único grupo experimental."
+                            )
+                    if r.tipo_sujeto == "autorizado" and r.persona == persona:
+                        raise ValueError(
+                            f"Conflicto de identidad: '{persona}' ya existe como persona autorizada y no puede añadirse como desconocido."
+                        )
+            elif tipo_sujeto == "autorizado":
+                for r in manifiesto.registros:
+                    if r.tipo_sujeto == "desconocido" and r.persona == persona:
+                        raise ValueError(
+                            f"Conflicto de identidad: '{persona}' ya existe como sujeto desconocido y no puede añadirse como autorizado."
+                        )
 
             dir_imagenes = dir_base / "imagenes" / sanitizar_componente_ruta(persona) / sanitizar_componente_ruta(sesion) / sanitizar_componente_ruta(pose)
             dir_imagenes.mkdir(parents=True, exist_ok=True)
 
-            manifiesto = ManifiestoDataset(ruta_manifiesto)
             ids_existentes = manifiesto.identificadores_existentes()
 
             fotos_existentes = list(dir_imagenes.glob("*.jpg"))
@@ -623,7 +894,13 @@ class GestorCamaraWeb:
                 dec_humana = decision or ("aprobada" if modo == "valida" else "pendiente")
                 caja_str = f";decision={dec_humana}"
 
-            anotacion = f"captura_web;modo={modo};frame_id={id_fotograma};estado={item.estado_deteccion.value}{caja_str}"
+            anot_meta = ""
+            if grupo:
+                anot_meta += f";destino={grupo}"
+            if distancia:
+                anot_meta += f";distancia={distancia}"
+
+            anotacion = f"captura_web;modo={modo};frame_id={id_fotograma};estado={item.estado_deteccion.value}{caja_str}{anot_meta}"
 
             registro = RegistroCaptura(
                 identificador=identificador,

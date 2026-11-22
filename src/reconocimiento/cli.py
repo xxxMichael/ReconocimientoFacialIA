@@ -18,13 +18,16 @@ from reconocimiento.adquisicion.propio import (
     RegistroCaptura,
     generar_manifiesto_plantilla_300,
     POSES_VALIDAS,
-    PARTICIONES_VALIDAS
+    PARTICIONES_VALIDAS,
+    validar_coherencia_sesion_particion_propio,
+    es_manifiesto_propio
 )
 from reconocimiento.adquisicion.camara import (
     sondear_camaras,
     ejecutar_vista_previa,
     ejecutar_modo_captura
 )
+from reconocimiento.preprocesamiento.fabrica import crear_detector
 from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion
 from reconocimiento.preprocesamiento.normalizador import (
     a_escala_de_grises,
@@ -303,8 +306,8 @@ def comando_ejecutar(args: argparse.Namespace) -> int:
         print(f"  - Por pose: {conteo['por_pose']}")
 
         # Fase 2: Preprocesamiento y Detección Facial
-        print(f"\n[2/4] Preprocesando y detectando rostros con Haar Cascade...")
-        detector = DetectorFacial()
+        print(f"\n[2/4] Preprocesando y detectando rostros con YuNet...")
+        detector = crear_detector()
         grid = (args.grid_y, args.grid_x)
 
         datos_prep = {
@@ -709,6 +712,12 @@ def comando_ejecutar(args: argparse.Namespace) -> int:
             "suavizado_sigma": args.sigma,
             "semilla_aleatoria": args.semilla,
             "estadisticas_deteccion": stats_deteccion,
+            "detector": {
+                "tipo": "YuNet",
+                "score_threshold": detector.score_threshold,
+                "nms_threshold": detector.nms_threshold,
+                "margen_expansion": detector.margen_expansion,
+            },
             "personas": personas_autorizadas,
             "umbral_rechazo_desconocido": 0.65
         })
@@ -880,7 +889,7 @@ def comando_ejecutar(args: argparse.Namespace) -> int:
 
             # Autorizados en validación:
             # A) Control Físico de Puerta:
-            # La puerta permanece cerrada si Haar no detecta rostro o si la confianza es < u.
+            # La puerta permanece cerrada si YuNet no detecta rostro o si la confianza es < u.
             rech_umbral_aut_val_u = int(np.sum(max_probs_val_aut < u)) if len(max_probs_val_aut) > 0 else 0
             bloqueos_puerta_val_u = fallo_haar_aut_val + rech_umbral_aut_val_u
             frr_puerta_val_u = (bloqueos_puerta_val_u / tot_aut_val * 100.0) if tot_aut_val > 0 else 0.0
@@ -1121,6 +1130,12 @@ def comando_registrar(args: argparse.Namespace) -> int:
         return 1
 
     ruta_manifiesto = Path(args.manifiesto)
+    if es_manifiesto_propio(ruta_manifiesto):
+        es_val_proto, err_proto = validar_coherencia_sesion_particion_propio(args.sesion, args.particion)
+        if not es_val_proto:
+            print(f"Error: {err_proto}")
+            return 1
+
     manifiesto = ManifiestoDataset(ruta_manifiesto)
 
     registro = RegistroCaptura(
@@ -1284,8 +1299,13 @@ def comando_web(args: argparse.Namespace) -> int:
     host = getattr(args, "host", "127.0.0.1")
     port = getattr(args, "port", 5000)
     indice = getattr(args, "indice", 1)
+    config_candidato = getattr(args, "config_candidato", None)
+    if not config_candidato:
+        ruta_default_std = Path("configuracion_candidato_estandar_portal_061.json")
+        if ruta_default_std.exists():
+            config_candidato = str(ruta_default_std)
 
-    app = crear_app(indice_inicial=indice)
+    app = crear_app(indice_inicial=indice, ruta_config_candidato=config_candidato)
 
     url_local = f"http://{host}:{port}/"
     print("\n=======================================================")
@@ -1293,6 +1313,8 @@ def comando_web(args: argparse.Namespace) -> int:
     print("=======================================================")
     print(f" Dirección web local:   {url_local}")
     print(f" Cámara predeterminada: Índice {indice} (DirectShow)")
+    if config_candidato:
+        print(f" Candidato congelado:   {config_candidato}")
     print(" Presione [Ctrl + C] para detener el servidor y liberar la cámara.")
     print("=======================================================\n")
 
@@ -1305,6 +1327,112 @@ def comando_web(args: argparse.Namespace) -> int:
     except Exception as e:
         print(f"\nError en el servidor web: {e}")
         return 1
+
+
+def comando_portal(args: argparse.Namespace) -> int:
+    """Inicia el portal público de captura independiente para voluntarios externos."""
+    from reconocimiento.portal.servidor import iniciar_servidor_portal
+    host = getattr(args, "host", "127.0.0.1")
+    puerto = getattr(args, "port", 5001)
+    hilos = getattr(args, "hilos", 4)
+    servidor = getattr(args, "servidor", "waitress")
+    try:
+        iniciar_servidor_portal(host=host, puerto=puerto, hilos=hilos, modo_servidor=servidor)
+        return 0
+    except KeyboardInterrupt:
+        print("\nPortal de captura detenido por el usuario.")
+        return 0
+    except Exception as e:
+        print(f"\nError al iniciar portal de captura: {e}", file=sys.stderr)
+        return 1
+
+
+def comando_portal_reconocimiento(args: argparse.Namespace) -> int:
+    """Inicia el portal independiente de reconocimiento facial remoto."""
+    from reconocimiento.portal_reconocimiento.servidor import iniciar_servidor_portal_reconocimiento
+    host = getattr(args, "host", "127.0.0.1")
+    puerto = getattr(args, "port", 5002)
+    hilos = getattr(args, "hilos", 4)
+    servidor = getattr(args, "servidor", "waitress")
+    try:
+        iniciar_servidor_portal_reconocimiento(host=host, puerto=puerto, hilos=hilos, modo_servidor=servidor)
+        return 0
+    except KeyboardInterrupt:
+        print("\nPortal de reconocimiento remoto detenido por el usuario.")
+        return 0
+    except Exception as e:
+        print(f"\nError al iniciar portal de reconocimiento remoto: {e}", file=sys.stderr)
+        return 1
+
+
+def comando_invitaciones(args: argparse.Namespace) -> int:
+    """Herramienta local de gestión de invitaciones para el portal público."""
+    from reconocimiento.portal.gestor_invitaciones import GestorInvitaciones
+    gestor = GestorInvitaciones()
+    accion = getattr(args, "accion_inv", None)
+
+    if accion == "crear":
+        try:
+            inv = gestor.crear_invitacion(
+                identificador=args.identificador,
+                notas=getattr(args, "notas", ""),
+                base_url=getattr(args, "base_url", None)
+            )
+            print(f"✓ Invitación creada: ID={inv['identificador']}, Token={inv['token']}, Enlace={inv['url']}")
+            return 0
+        except Exception as e:
+            print(f"Error al crear invitación: {e}", file=sys.stderr)
+            return 1
+    elif accion == "listar":
+        invs = gestor.listar_invitaciones(base_url=getattr(args, "base_url", None))
+        print("\n" + "=" * 70)
+        print(" INVITACIONES REGISTRADAS DEL PORTAL")
+        print("=" * 70)
+        for inv in invs:
+            est = "ACTIVA" if inv.get("activo") else "DESACTIVADA"
+            print(f"[{est}] ID: {inv.get('identificador')} | Token: {inv.get('token')}")
+            print(f"       Enlace: {inv.get('url')}")
+        print("=" * 70 + "\n")
+        return 0
+    elif accion == "desactivar":
+        exito = gestor.desactivar_invitacion(args.token_o_id)
+        if exito:
+            print(f"✓ Invitación '{args.token_o_id}' desactivada.")
+            return 0
+        print(f"Error: No se encontró invitación para '{args.token_o_id}'.", file=sys.stderr)
+        return 1
+    elif accion == "activar":
+        exito = gestor.activar_invitacion(args.token_o_id)
+        if exito:
+            print(f"✓ Invitación '{args.token_o_id}' reactivada.")
+            return 0
+        print(f"Error: No se encontró invitación para '{args.token_o_id}'.", file=sys.stderr)
+        return 1
+    else:
+        print("Acción no especificada. Use: crear, listar, desactivar o activar.")
+        return 1
+
+
+def comando_importar_externos(args: argparse.Namespace) -> int:
+    """Importa capturas de voluntarios desde la carpeta de recepción al manifiesto."""
+    from reconocimiento.portal.importador import importar_capturas_externas
+    dir_rec = Path(args.recepcion) if getattr(args, "recepcion", None) else None
+    ruta_man = Path(args.manifiesto) if getattr(args, "manifiesto", None) else None
+    id_f = getattr(args, "identificador", None)
+    excluir_str = getattr(args, "excluir", "") or ""
+    excluir_lista = [x.strip() for x in excluir_str.split(",") if x.strip()]
+    incluir_pilotos = getattr(args, "incluir_pilotos", False)
+
+    stats = importar_capturas_externas(
+        dir_recepcion=dir_rec,
+        ruta_manifiesto_destino=ruta_man,
+        identificador_filtro=id_f,
+        excluir_identificadores=excluir_lista,
+        excluir_pilotos=not incluir_pilotos
+    )
+    print(f"Importación completada: {stats['importadas_nuevas']} nuevas, {stats['omitidas_ya_existentes']} existentes, {stats.get('omitidas_piloto', 0)} pilotos excluidos, {len(stats['errores'])} errores.")
+    print(f"Manifiesto destino: {stats['ruta_manifiesto']}")
+    return 0
 
 
 def comando_procesar_imagen(args: argparse.Namespace) -> int:
@@ -1328,7 +1456,7 @@ def comando_procesar_imagen(args: argparse.Namespace) -> int:
         return 1
 
     gris = a_escala_de_grises(imagen_bgr)
-    detector = DetectorFacial()
+    detector = crear_detector()
     resultado_det = detector.detectar(gris, es_pre_recortada=args.pre_recortada)
 
     print(f"Estado de detección: {resultado_det.estado.value}")
@@ -1482,7 +1610,7 @@ def comando_test_controlado(args: argparse.Namespace) -> int:
     dir_salida.mkdir(parents=True, exist_ok=True)
     print("\n=== EJECUTANDO PRUEBAS CONTROLADAS DE DETECCIÓN Y BORDES ===")
 
-    detector = DetectorFacial()
+    detector = crear_detector()
     errores = []
 
     # Caso 1: Imagen sin rostro (ruido o fondo sintético)
@@ -1622,13 +1750,54 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser_web = subparsers.add_parser("web", help="Iniciar interfaz web local para adquisición facial")
     parser_web.add_argument("--indice", type=int, default=1, help="Índice inicial de la cámara DirectShow (default: 1)")
     parser_web.add_argument("--host", type=str, default="127.0.0.1", help="Host donde escuchar (default: 127.0.0.1)")
-    parser_web.add_argument("--port", type=int, default=5000, help="Puerto donde escuchar (default: 5000)")
+    parser_web.add_argument("--port", "--puerto", dest="port", type=int, default=5000, help="Puerto donde escuchar (default: 5000)")
+    parser_web.add_argument("--config-candidato", type=str, default=None, help="Ruta al archivo de configuración congelada del candidato (JSON)")
 
     # Subcomando 'evaluar-lfw'
     parser_lfw = subparsers.add_parser("evaluar-lfw", help="Evaluación externa de la CNN en producción con LFW (100 identidades)")
     parser_lfw.add_argument("--semilla", type=int, default=42, help="Semilla aleatoria reproducible (default: 42)")
     parser_lfw.add_argument("--n-identidades", type=int, default=100, help="Número de identidades a evaluar (default: 100)")
     parser_lfw.add_argument("--salida", type=str, default="resultados/evaluacion_externa_lfw_cnn", help="Directorio de salida")
+
+    # Subcomando 'portal'
+    parser_portal = subparsers.add_parser("portal", help="Iniciar portal público de captura independiente (voluntarios externos)")
+    parser_portal.add_argument("--host", type=str, default="127.0.0.1", help="Host de escucha (default: 127.0.0.1)")
+    parser_portal.add_argument("--port", "--puerto", dest="port", type=int, default=5001, help="Puerto de escucha (default: 5001)")
+    parser_portal.add_argument("--hilos", type=int, default=4, help="Número de hilos WSGI (default: 4)")
+    parser_portal.add_argument("--servidor", type=str, default="waitress", choices=["waitress", "flask"], help="Servidor WSGI (default: waitress)")
+
+    # Subcomando 'portal-reconocimiento'
+    parser_portal_rec = subparsers.add_parser("portal-reconocimiento", help="Iniciar portal independiente de reconocimiento remoto")
+    parser_portal_rec.add_argument("--host", type=str, default="127.0.0.1", help="Host de escucha (default: 127.0.0.1)")
+    parser_portal_rec.add_argument("--port", "--puerto", dest="port", type=int, default=5002, help="Puerto de escucha (default: 5002)")
+    parser_portal_rec.add_argument("--hilos", type=int, default=4, help="Número de hilos WSGI (default: 4)")
+    parser_portal_rec.add_argument("--servidor", type=str, default="waitress", choices=["waitress", "flask"], help="Servidor WSGI (default: waitress)")
+
+    # Subcomando 'invitaciones'
+    parser_inv = subparsers.add_parser("invitaciones", help="Gestionar invitaciones del portal público")
+    subparsers_inv = parser_inv.add_subparsers(dest="accion_inv", required=True)
+
+    p_inv_crear = subparsers_inv.add_parser("crear", help="Crear nueva invitación")
+    p_inv_crear.add_argument("--id", "--identificador", required=True, dest="identificador", help="Identificador anónimo (ej. externo_001)")
+    p_inv_crear.add_argument("--notas", default="", help="Notas del participante")
+    p_inv_crear.add_argument("--base-url", default=None, help="URL pública base (ej. https://xyz.trycloudflare.com)")
+
+    p_inv_listar = subparsers_inv.add_parser("listar", help="Listar invitaciones")
+    p_inv_listar.add_argument("--base-url", default=None, help="URL pública base")
+
+    p_inv_desact = subparsers_inv.add_parser("desactivar", help="Desactivar invitación")
+    p_inv_desact.add_argument("--token-o-id", required=True, help="Token o ID a desactivar")
+
+    p_inv_act = subparsers_inv.add_parser("activar", help="Reactivar invitación")
+    p_inv_act.add_argument("--token-o-id", required=True, help="Token o ID a reactivar")
+
+    # Subcomando 'importar-externos'
+    parser_imp = subparsers.add_parser("importar-externos", help="Importar capturas externas al manifiesto del proyecto")
+    parser_imp.add_argument("--recepcion", type=str, default=None, help="Directorio de recepción (default: data/recepcion_externa)")
+    parser_imp.add_argument("--manifiesto", type=str, default=None, help="Ruta al manifiesto destino")
+    parser_imp.add_argument("--id", "--identificador", dest="identificador", default=None, help="Importar EXCLUSIVAMENTE este identificador")
+    parser_imp.add_argument("--excluir", type=str, default="", help="Identificadores a excluir separados por coma (ej. externo_piloto)")
+    parser_imp.add_argument("--incluir-pilotos", action="store_true", default=False, help="Permitir importar identificadores con nombre 'piloto' o 'test'")
 
     args = parser.parse_args(argv)
 
@@ -1656,6 +1825,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         return comando_verificar_protocolo(args)
     elif args.subcomando == "web":
         return comando_web(args)
+    elif args.subcomando == "portal":
+        return comando_portal(args)
+    elif args.subcomando == "portal-reconocimiento":
+        return comando_portal_reconocimiento(args)
+    elif args.subcomando == "invitaciones":
+        return comando_invitaciones(args)
+    elif args.subcomando == "importar-externos":
+        return comando_importar_externos(args)
     elif args.subcomando == "evaluar-lfw":
         from reconocimiento.evaluacion.lfw import evaluar_lfw_cnn
         try:

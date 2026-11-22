@@ -1,0 +1,84 @@
+{
+  "candidato": {
+    "identificador": "cnn_antialiasing_052",
+    "nombre": "CNN Antialiasing — 0.52",
+    "tipo_arquitectura": "CNN",
+    "ruta_modelo": "resultados/exp_4clases_antialiasing_20261120_233516/cnn/modelo.pt",
+    "sha256_modelo": "581b805b649be08577e8157fe26fc30d8d8bfe90a3b4819379f42051bc613f7f",
+    "umbral_score": 0.52,
+    "orden_clases": [
+      "persona_1",
+      "persona_2",
+      "persona_3",
+      "desconocido"
+    ],
+    "mapeo_clases": {
+      "0": "persona_1",
+      "1": "persona_2",
+      "2": "persona_3",
+      "3": "desconocido"
+    },
+    "personas_autorizadas": [
+      "persona_1",
+      "persona_2",
+      "persona_3"
+    ],
+    "fecha_propuesta": "2026-11-20T23:37:47.765520",
+    "estado": "principal_pruebas",
+    "fecha_congelamiento": "2026-11-21T11:50:15.335528"
+  },
+  "detector_facial": {
+    "tipo": "YuNet",
+    "ruta_modelo": "modelos/detector/face_detection_yunet_2023mar.onnx",
+    "sha256_modelo": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "parametros": {
+      "score_threshold": 0.6,
+      "nms_threshold": 0.3,
+      "margen_expansion": 0.1,
+      "modo_multiorientacion": "cascada",
+      "orientaciones_soportadas": [
+        0,
+        90,
+        180,
+        270
+      ]
+    }
+  },
+  "preprocesamiento": {
+    "metodo": "alineacion_5puntos",
+    "plantilla_canonica": "PLANTILLA_FACIAL_64x64",
+    "resolucion": [
+      64,
+      64
+    ],
+    "interpolacion": "INTER_AREA_o_LINEAR",
+    "borde": "BORDER_REFLECT_101",
+    "transformacion": "similitud_2d_sin_reflejo",
+    "normalizacion_intensidad": "float32_0_1",
+    "suavizado_gaussiano": {
+      "sigma": 0.5,
+      "kernel": "automatico"
+    },
+    "metodo_remuestreo": "supersampling_area",
+    "descripcion_remuestreo": "Sobremuestreo k=clamp(round(1/escala), 2, 16) antes de cv2.resize(..., INTER_AREA) cuando escala < 0.9",
+    "parametros_remuestreo": {
+      "metodo": "supersampling_area",
+      "umbral_escala_reduccion": 0.9,
+      "factor_k_formula": "clamp(round(1.0 / escala), 2, 16)",
+      "desplazamiento_subpixel": "(k - 1) * 0.5",
+      "warp_intermedio": "cv2.INTER_LINEAR",
+      "reduccion_final": "cv2.resize(..., (64, 64), interpolation=cv2.INTER_AREA)",
+      "gaussiano_posterior_sigma": 0.5,
+      "gaussiano_posterior_kernel": [
+        5,
+        5
+      ]
+    }
+  },
+  "regla_acceso": {
+    "tipo": "regla_canonica_completa",
+    "restriccion_frr_persona_max": 0.3,
+    "decision_puerta_desconocido": "CERRADA_ESTRICTA",
+    "criterio_apertura": "score >= umbral_score AND clase_predicha IN personas_autorizadas AND deteccion == 'UN_ROSTRO'"
+  }
+}

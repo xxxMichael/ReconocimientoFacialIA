@@ -1377,3 +1377,241 @@ body {
   display: flex;
   gap: 10px;
 }
+
+/* =========================================================================
+ * SECCIÓN: INSPECTOR DE PREPROCESAMIENTO Y RASGOS FACIALES
+ * ========================================================================= */
+.pipeline-layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pipeline-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 14px 20px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pipeline-source-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pipeline-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pipeline-auto-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pipeline-status-msg {
+  margin: 0 20px 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(248, 81, 73, 0.14);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  color: #ff7b72;
+  font-size: 0.88rem;
+}
+
+.pipeline-phases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 960px) {
+  .pipeline-phases-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pipeline-phase-wide {
+  grid-column: 1 / -1;
+}
+
+.pipeline-img-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0d1117;
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  min-height: 220px;
+}
+
+.pipeline-img {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.pipeline-prep-trio {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 10px;
+  background: #0d1117;
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.prep-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pipeline-thumb {
+  width: 128px;
+  height: 128px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: #161b22;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pipeline-meta-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 16px 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.pipeline-meta-list strong {
+  color: var(--text-main);
+}
+
+.pipeline-hint {
+  padding: 4px 16px 14px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pipeline-features-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+@media (max-width: 1100px) {
+  .pipeline-features-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.feature-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+
+.feature-panel h4 {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  color: var(--text-main);
+}
+
+.pipeline-thumb-lg {
+  width: 192px;
+  height: 192px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #161b22;
+}
+
+.pipeline-classif-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 16px;
+}
+
+@media (max-width: 800px) {
+  .pipeline-classif-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.classif-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.classif-summary strong {
+  color: var(--text-main);
+}
+
+.classif-probs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prob-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.84rem;
+}
+
+.prob-bar-label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.prob-bar-track {
+  width: 100%;
+  height: 10px;
+  background: #0d1117;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.prob-bar-fill {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.2s ease;
+}
+
+.prob-bar-fill.es-argmax {
+  background: #10b981;
+}

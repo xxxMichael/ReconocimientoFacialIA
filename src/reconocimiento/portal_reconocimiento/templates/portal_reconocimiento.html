@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Remoto de Reconocimiento Facial</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='portal_reconocimiento.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Reconocimiento Facial Remoto</h1>
+      <p class="subtitle">Prueba en vivo desde tu celular o laptop. Procesamiento 100% en memoria: <strong>no se guardan fotografías</strong>.</p>
+    </header>
+
+    <section class="card">
+      <div class="consent-box">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-consentimiento">
+          <span>Acepto el procesamiento temporal de mi cámara para esta prueba de reconocimiento facial. Entiendo que las imágenes se analizan únicamente en memoria y no se almacenan.</span>
+        </label>
+      </div>
+
+      <div class="controls-grid">
+        <div class="field">
+          <label for="select-candidato">Modelo Candidato:</label>
+          <select id="select-candidato">
+            {% for c in candidatos %}
+            <option value="{{ c.id }}" data-umbral="{{ c.umbral_pct }}" data-nombre="{{ c.nombre }}" {% if c.id == candidato_principal_id %}selected{% endif %}>
+              {{ c.nombre }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="select-camara">Cámara:</label>
+          <select id="select-camara">
+            <option value="user" selected>Frontal (Selfie)</option>
+            <option value="environment">Trasera</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="meta-bar">
+        <span>Candidato activo: <strong id="lbl-candidato-activo">—</strong></span>
+        <span>Umbral efectivo (fijo): <strong id="lbl-umbral-fijo">—</strong></span>
+      </div>
+
+      <div class="actions-row">
+        <button id="btn-iniciar" class="btn btn-primary" disabled>Iniciar Cámara</button>
+        <button id="btn-detener" class="btn btn-secondary" disabled>Detener Cámara</button>
+      </div>
+    </section>
+
+    <section class="grid-main">
+      <div class="card video-card">
+        <div class="video-wrapper">
+          <video id="video-preview" autoplay playsinline muted></video>
+          <div id="video-placeholder" class="placeholder">Cámara detenida</div>
+        </div>
+        <div class="status-row">
+          <span id="badge-detector" class="badge badge-neutral">SIN_CAMARA</span>
+          <span id="lbl-latencia" class="muted">Latencia: —</span>
+        </div>
+      </div>
+
+      <div class="card result-card">
+        <div id="door-box" class="door-box door-closed">
+          <div class="door-icon" id="door-icon">🔒</div>
+          <div class="door-state" id="door-state">PUERTA CERRADA</div>
+          <div class="door-reason" id="door-reason">Inicia la cámara para comenzar.</div>
+        </div>
+
+        <div class="metrics-list">
+          <div class="metric-item">
+            <span>Identidad predicha</span>
+            <strong id="lbl-identidad">—</strong>
+          </div>
+          <div class="metric-item">
+            <span>Confianza (Score)</span>
+            <strong id="lbl-score">—</strong>
+          </div>
+          <div class="progress-track">
+            <div id="score-bar" class="progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Registrar Intento Evaluado</h2>
+      <p class="muted small">
+        La vista previa continua no se guarda como prueba. Usa este botón para registrar un único intento asociado al fotograma actual (incluye fallos de detección).
+      </p>
+
+      <div class="controls-grid">
+        <div class="field">
+          <label for="select-categoria-real">Categoría real declarada:</label>
+          <select id="select-categoria-real">
+            <option value="desconocido" selected>desconocido</option>
+            <option value="persona_1">persona_1</option>
+            <option value="persona_2">persona_2</option>
+            <option value="persona_3">persona_3</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="input-participante">ID anónimo de participante:</label>
+          <input type="text" id="input-participante" maxlength="40" placeholder="part_...">
+        </div>
+      </div>
+
+      <p class="muted small">
+        Aviso: las etiquetas son autodeclaradas por los participantes y no influyen en la inferencia del modelo. Varios intentos de una misma persona no equivalen a nuevas identidades independientes.
+      </p>
+
+      <div class="actions-row">
+        <button id="btn-registrar-intento" class="btn btn-accent" disabled>Registrar intento</button>
+        <button id="btn-descartar-intento" class="btn btn-secondary hidden" disabled>Descartar intento pendiente</button>
+      </div>
+      <div id="intento-feedback" class="feedback hidden"></div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='portal_reconocimiento.js') }}"></script>
+</body>
+</html>

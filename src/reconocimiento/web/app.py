@@ -14,11 +14,15 @@ import cv2
 from flask import Flask, Response, jsonify, render_template, request
 
 from reconocimiento.adquisicion.camara import sondear_camaras
-from reconocimiento.adquisicion.propio import ManifiestoDataset
+from reconocimiento.adquisicion.propio import (
+    ManifiestoDataset,
+    MAPEO_SESION_PARTICION_PROPIO,
+    validar_coherencia_sesion_particion_propio
+)
 from reconocimiento.web.streamer import GestorCamaraWeb, calcular_progreso_sesion
 
 
-def crear_app(indice_inicial: int = 1) -> Flask:
+def crear_app(indice_inicial: int = 1, ruta_config_candidato: Optional[Path] = None) -> Flask:
     """Crea y configura la aplicación Flask para la interfaz web de adquisición y acceso."""
     directorio_base = Path(__file__).parent
     app = Flask(
@@ -31,37 +35,49 @@ def crear_app(indice_inicial: int = 1) -> Flask:
     gestor = GestorCamaraWeb()
     app.config["GESTOR_CAMARA"] = gestor
 
-    # Cargar explícitamente el modelo seleccionado por validación
-    ruta_seleccion = Path("resultados/modelo_seleccionado.json")
-    if not ruta_seleccion.exists():
-        try:
-            from reconocimiento.clasificacion.seleccion import seleccionar_mejor_modelo_propio
-            seleccionar_mejor_modelo_propio(dir_resultados=Path("resultados"), ruta_destino=ruta_seleccion)
-        except Exception as e_sel:
-            print(f"[RECONOCIMIENTO] Aviso al generar selección de modelos: {e_sel}")
-
     modelo_cargado_exitosamente = False
-    if ruta_seleccion.exists():
-        try:
-            with open(ruta_seleccion, "r", encoding="utf-8") as f_sel:
-                info_sel = json.load(f_sel)
-            modelo_elegido = info_sel.get("modelo_elegido", "")
-            tiene_calibracion = info_sel.get("calibracion_completa", True)
-            dir_mod_str = info_sel.get("directorio_modelo", "")
 
-            if tiene_calibracion and modelo_elegido and (modelo_elegido.lower() != "ninguno") and dir_mod_str:
-                dir_mod = Path(dir_mod_str)
-                if dir_mod.exists():
-                    val_u = info_sel.get("umbral_recomendado")
-                    if val_u is None:
-                        val_u = info_sel.get("umbral_congelado", info_sel.get("umbral", 0.65))
-                    umbral_mod = float(val_u)
-                    res_load = gestor.cargar_modelo(directorio_modelo=dir_mod, umbral=umbral_mod)
-                    modelo_cargado_exitosamente = res_load.get("status") == "ok"
-                    print(f"[RECONOCIMIENTO] Modelo seleccionado por validación: {modelo_elegido.upper()} "
-                          f"(Val Acc: {info_sel.get('exactitud_validacion_pct')}%, Umbral: {umbral_mod*100:.0f}%) -> {res_load.get('mensaje')}")
-        except Exception as e_load_sel:
-            print(f"[RECONOCIMIENTO] Fallo al cargar modelo seleccionado: {e_load_sel}")
+    # 1. Si se especifica una configuración congelada de candidato, cargarla con prioridad exclusiva
+    if ruta_config_candidato:
+        ruta_cfg = Path(ruta_config_candidato)
+        res_cand = gestor.cargar_desde_configuracion_congelada(ruta_cfg)
+        if res_cand.get("status") == "ok":
+            modelo_cargado_exitosamente = True
+            print(f"[RECONOCIMIENTO] {res_cand.get('mensaje')}")
+        else:
+            print(f"[RECONOCIMIENTO] Error al cargar candidato congelado desde {ruta_cfg}: {res_cand.get('mensaje')}")
+
+    # 2. Si no se especificó candidato, mantener el modelo seleccionado por validación predeterminado
+    if not modelo_cargado_exitosamente and not ruta_config_candidato:
+        ruta_seleccion = Path("resultados/modelo_seleccionado.json")
+        if not ruta_seleccion.exists():
+            try:
+                from reconocimiento.clasificacion.seleccion import seleccionar_mejor_modelo_propio
+                seleccionar_mejor_modelo_propio(dir_resultados=Path("resultados"), ruta_destino=ruta_seleccion)
+            except Exception as e_sel:
+                print(f"[RECONOCIMIENTO] Aviso al generar selección de modelos: {e_sel}")
+
+        if ruta_seleccion.exists():
+            try:
+                with open(ruta_seleccion, "r", encoding="utf-8") as f_sel:
+                    info_sel = json.load(f_sel)
+                modelo_elegido = info_sel.get("modelo_elegido", "")
+                tiene_calibracion = info_sel.get("calibracion_completa", True)
+                dir_mod_str = info_sel.get("directorio_modelo", "")
+
+                if tiene_calibracion and modelo_elegido and (modelo_elegido.lower() != "ninguno") and dir_mod_str:
+                    dir_mod = Path(dir_mod_str)
+                    if dir_mod.exists():
+                        val_u = info_sel.get("umbral_recomendado")
+                        if val_u is None:
+                            val_u = info_sel.get("umbral_congelado", info_sel.get("umbral", 0.65))
+                        umbral_mod = float(val_u)
+                        res_load = gestor.cargar_modelo(directorio_modelo=dir_mod, umbral=umbral_mod)
+                        modelo_cargado_exitosamente = res_load.get("status") == "ok"
+                        print(f"[RECONOCIMIENTO] Modelo seleccionado por validación: {modelo_elegido.upper()} "
+                              f"(Val Acc: {info_sel.get('exactitud_validacion_pct')}%, Umbral: {umbral_mod*100:.0f}%) -> {res_load.get('mensaje')}")
+            except Exception as e_load_sel:
+                print(f"[RECONOCIMIENTO] Fallo al cargar modelo seleccionado: {e_load_sel}")
 
     if not modelo_cargado_exitosamente:
         # Si ningún modelo cuenta con calibración completa, la interfaz web sigue 100%
@@ -152,6 +168,18 @@ def crear_app(indice_inicial: int = 1) -> Flask:
         if modelo:
             if modelo == "ninguno":
                 res = gestor.desactivar_modelo("Modelo desactivado manualmente.")
+                return jsonify(res)
+
+            candidatos_congelados = {
+                "cnn_antialiasing_052": Path("configuracion_candidato_antialiasing_052.json"),
+                "cnn_estandar_portal_061": Path("configuracion_candidato_estandar_portal_061.json"),
+            }
+            if modelo in candidatos_congelados:
+                ruta_cfg = candidatos_congelados[modelo]
+                res = gestor.cargar_desde_configuracion_congelada(ruta_cfg)
+                if res.get("status") != "ok":
+                    return jsonify(res), 404 if not ruta_cfg.exists() else 400
+                res["candidato_id"] = modelo
                 return jsonify(res)
 
             ruta_m = Path(f"resultados/{modelo}_propio")
@@ -260,9 +288,9 @@ def crear_app(indice_inicial: int = 1) -> Flask:
         sesion = request.args.get("sesion", default="sesion_01").strip()
 
         if es_ensayo:
-            ruta_manifiesto = Path("data/ensayos/manifiesto_ensayo.csv")
+            ruta_manifiesto = gestor.dir_ensayos / "manifiesto_ensayo.csv"
         else:
-            ruta_manifiesto = Path("data/propio/manifiesto.csv")
+            ruta_manifiesto = gestor.dir_propio / "manifiesto.csv"
 
         manifiesto = ManifiestoDataset(ruta_manifiesto)
         # Sincronización automática: si se borraron imágenes manualmente del disco, limpiar el manifiesto
@@ -325,6 +353,14 @@ def crear_app(indice_inicial: int = 1) -> Flask:
             "total_rostros": item.total_rostros,
             "ancho": w,
             "alto": h,
+            "persona": data.get("persona", "persona_1"),
+            "tipo_sujeto": data.get("tipo_sujeto", "autorizado"),
+            "grupo": data.get("grupo", ""),
+            "distancia": data.get("distancia", ""),
+            "sesion": data.get("sesion", "sesion_01"),
+            "pose": data.get("pose", "frontal"),
+            "particion": data.get("particion", "entrenamiento"),
+            "consentimiento": bool(data.get("consentimiento", False)),
             "image_base64": b64_raw,
             "recorte_base64": recorte_b64
         })
@@ -348,6 +384,14 @@ def crear_app(indice_inicial: int = 1) -> Flask:
             caja = data.get("caja", None)
             decision = data.get("decision", None)
             origen_caja = data.get("origen_caja", None)
+            grupo = data.get("grupo", None)
+            distancia = data.get("distancia", None)
+
+            # Validación preventiva del protocolo sesión -> partición sólo para autorizados
+            if not es_ensayo and tipo_sujeto == "autorizado":
+                es_val_proto, err_proto = validar_coherencia_sesion_particion_propio(sesion, particion)
+                if not es_val_proto:
+                    return jsonify({"status": "error", "tipo": "INCONSISTENCIA_PROTOCOLO", "mensaje": err_proto}), 400
 
             resultado = gestor.procesar_captura_web(
                 id_fotograma=id_fotograma,
@@ -362,7 +406,9 @@ def crear_app(indice_inicial: int = 1) -> Flask:
                 idempotency_key=idempotency_key,
                 caja=caja,
                 decision=decision,
-                origen_caja=origen_caja
+                origen_caja=origen_caja,
+                grupo=grupo,
+                distancia=distancia
             )
             return jsonify(resultado)
 
@@ -375,17 +421,125 @@ def crear_app(indice_inicial: int = 1) -> Flask:
         except Exception as e:
             return jsonify({"status": "error", "tipo": "INTERNO", "mensaje": f"Error inesperado: {e}"}), 500
 
+    @app.route("/api/protocolo/particiones", methods=["GET"])
+    def api_protocolo_particiones():
+        """Retorna el mapeo reglamentario de sesión a partición para el dataset propio."""
+        return jsonify({
+            "status": "ok",
+            "mapeo_sesion_particion": MAPEO_SESION_PARTICION_PROPIO
+        })
+
+    def _cargar_fotos_desc_y_revisiones():
+        raiz_proj = Path(__file__).resolve().parents[3]
+        ruta_man_u = raiz_proj / "data" / "universidad_desc" / "manifiesto_universidad.csv"
+        ruta_rev_u = raiz_proj / "data" / "universidad_desc" / "revision_universidad.json"
+        import csv as _csv
+
+        revisiones_u = {}
+        if ruta_rev_u.exists():
+            try:
+                revisiones_u = json.loads(ruta_rev_u.read_text(encoding="utf-8"))
+            except Exception:
+                revisiones_u = {}
+
+        filas_u = []
+        if ruta_man_u.exists():
+            with ruta_man_u.open(encoding="utf-8", newline="") as f_u:
+                filas_u = list(_csv.DictReader(f_u))
+        else:
+            dir_fd = raiz_proj / "data" / "recepcion_externa" / "fotos_desc"
+            if dir_fd.exists():
+                for idx_f, p_f in enumerate(sorted(dir_fd.iterdir(), key=lambda x: x.name), 1):
+                    if p_f.is_file():
+                        filas_u.append({
+                            "identificador": f"universidad_{idx_f:03d}",
+                            "ruta": str(p_f.relative_to(raiz_proj)).replace("\\", "/"),
+                            "particion": "sin_particion",
+                            "tipo_sujeto": "desconocido",
+                            "procedencia": "fotos_desc",
+                        })
+        return raiz_proj, filas_u, revisiones_u, ruta_rev_u
+
     @app.route("/api/revision/capturas", methods=["GET"])
     def api_revision_capturas():
         """Retorna lista de capturas del manifiesto con metadatos de revisión y filtros."""
         es_ensayo = request.args.get("es_ensayo", default="false").lower() in ("true", "1", "si")
+        entorno = request.args.get("entorno", default="").strip().lower()
+        if not entorno:
+            entorno = "ensayo" if es_ensayo else "real"
+
         persona_f = request.args.get("persona", default="").strip()
         sesion_f = request.args.get("sesion", default="").strip()
         pose_f = request.args.get("pose", default="").strip()
         particion_f = request.args.get("particion", default="").strip()
         decision_f = request.args.get("decision", default="").strip()
+        tipo_sujeto_f = request.args.get("tipo_sujeto", default="").strip()
+        grupo_f = request.args.get("grupo", default="").strip()
+        distancia_f = request.args.get("distancia", default="").strip()
 
-        ruta_manifiesto = Path("data/ensayos/manifiesto_ensayo.csv") if es_ensayo else Path("data/propio/manifiesto.csv")
+        if entorno == "fotos_desc":
+            raiz_proj, filas_u, revisiones_u, ruta_rev_u = _cargar_fotos_desc_y_revisiones()
+            items = []
+            for fila in filas_u:
+                ident = fila["identificador"]
+                part = fila.get("particion", "")
+                rev_info = revisiones_u.get(ident, {})
+                dec_hum = rev_info.get("decision", "pendiente")
+
+                if particion_f and particion_f.lower() != "todas" and part != particion_f:
+                    continue
+                if decision_f and decision_f.lower() != "todas" and dec_hum != decision_f:
+                    continue
+
+                ruta_abs = raiz_proj / fila["ruta"]
+                existe_archivo = ruta_abs.is_file()
+                caja_actual = tuple(rev_info["caja"]) if rev_info.get("caja") else None
+                origen = rev_info.get("origen_caja", "")
+                es_recalculada = False
+
+                if caja_actual is None and existe_archivo:
+                    try:
+                        img_disco = cv2.imread(str(ruta_abs))
+                        if img_disco is not None:
+                            res_det = gestor.detector.detectar(img_disco)
+                            if res_det.recuadro is not None:
+                                caja_actual = res_det.recuadro
+                                origen = "recalculada"
+                                es_recalculada = True
+                    except Exception as e_det:
+                        print(f"[REVISION fotos_desc] Error detección {ident}: {e_det}")
+
+                items.append({
+                    "identificador": ident,
+                    "persona": ident,
+                    "sesion": "fotos_desc",
+                    "pose": "no_documentada",
+                    "particion": part,
+                    "tipo_sujeto": "desconocido",
+                    "grupo": "universidad_desc",
+                    "distancia": "",
+                    "consentimiento": True,
+                    "ruta": fila["ruta"],
+                    "existe_disco": existe_archivo,
+                    "decision_humana": dec_hum,
+                    "estado_historico_detector": "UN_ROSTRO" if caja_actual else "SIN_ROSTRO",
+                    "caja": list(caja_actual) if caja_actual else None,
+                    "origen_caja": origen if origen else ("recalculada" if es_recalculada else ""),
+                    "es_recalculada": es_recalculada,
+                    "rotulo_caja": "recalculada" if es_recalculada else (origen if origen else "sin caja"),
+                    "anotaciones": fila.get("procedencia", ""),
+                })
+
+            return jsonify({
+                "status": "ok",
+                "total": len(items),
+                "es_ensayo": False,
+                "entorno": "fotos_desc",
+                "manifiesto": str(ruta_rev_u),
+                "capturas": items,
+            })
+
+        ruta_manifiesto = gestor.dir_ensayos / "manifiesto_ensayo.csv" if es_ensayo else gestor.dir_propio / "manifiesto.csv"
         manifiesto = ManifiestoDataset(ruta_manifiesto)
 
         items = []
@@ -399,6 +553,12 @@ def crear_app(indice_inicial: int = 1) -> Flask:
             if particion_f and particion_f.lower() != "todas" and reg.particion != particion_f:
                 continue
             if decision_f and decision_f.lower() != "todas" and reg.decision_humana != decision_f:
+                continue
+            if tipo_sujeto_f and tipo_sujeto_f.lower() != "todas" and reg.tipo_sujeto != tipo_sujeto_f:
+                continue
+            if grupo_f and grupo_f.lower() != "todas" and (reg.destino_experimental or "") != grupo_f:
+                continue
+            if distancia_f and distancia_f.lower() != "todas" and (reg.distancia or "") != distancia_f:
                 continue
 
             existe_archivo = Path(reg.ruta).is_file()
@@ -426,6 +586,9 @@ def crear_app(indice_inicial: int = 1) -> Flask:
                 "pose": reg.pose,
                 "particion": reg.particion,
                 "tipo_sujeto": reg.tipo_sujeto,
+                "grupo": reg.destino_experimental or "",
+                "distancia": reg.distancia or "",
+                "consentimiento": reg.consentimiento,
                 "ruta": reg.ruta,
                 "existe_disco": existe_archivo,
                 "decision_humana": reg.decision_humana,
@@ -445,11 +608,92 @@ def crear_app(indice_inicial: int = 1) -> Flask:
             "capturas": items
         })
 
+    @app.route("/api/progreso/desconocidos", methods=["GET"])
+    def api_progreso_desconocidos():
+        """Recupera la cobertura y estado de avance de los grupos de sujetos desconocidos."""
+        es_ensayo = request.args.get("es_ensayo", default="false").lower() in ("true", "1", "si")
+        ruta_manifiesto = gestor.dir_ensayos / "manifiesto_ensayo.csv" if es_ensayo else gestor.dir_propio / "manifiesto.csv"
+        manifiesto = ManifiestoDataset(ruta_manifiesto)
+        cobertura = manifiesto.verificar_cobertura_desconocidos()
+        return jsonify({
+            "status": "ok",
+            "es_ensayo": es_ensayo,
+            "manifiesto": str(ruta_manifiesto),
+            "cobertura": cobertura
+        })
+
     @app.route("/api/revision/detalle/<identificador>", methods=["GET"])
     def api_revision_detalle(identificador: str):
         """Retorna imagen original y recorte exacto que recibiría el clasificador para inspección detallada."""
         es_ensayo = request.args.get("es_ensayo", default="false").lower() in ("true", "1", "si")
-        ruta_manifiesto = Path("data/ensayos/manifiesto_ensayo.csv") if es_ensayo else Path("data/propio/manifiesto.csv")
+        entorno = request.args.get("entorno", default="").strip().lower()
+        if not entorno:
+            entorno = "ensayo" if es_ensayo else "real"
+
+        if entorno == "fotos_desc":
+            raiz_proj, filas_u, revisiones_u, _ = _cargar_fotos_desc_y_revisiones()
+            fila_obj = next((f for f in filas_u if f["identificador"] == identificador), None)
+            if fila_obj is None:
+                return jsonify({"status": "error", "mensaje": f"Captura '{identificador}' no encontrada en fotos_desc."}), 404
+
+            p_img = raiz_proj / fila_obj["ruta"]
+            if not p_img.is_file():
+                return jsonify({"status": "error", "mensaje": f"Archivo no existe en disco: {fila_obj['ruta']}"}), 404
+
+            img = cv2.imread(str(p_img))
+            if img is None:
+                return jsonify({"status": "error", "mensaje": "No se pudo decodificar la imagen."}), 500
+
+            h, w = img.shape[:2]
+            rev_info = revisiones_u.get(identificador, {})
+            caja = tuple(rev_info["caja"]) if rev_info.get("caja") else None
+            origen = rev_info.get("origen_caja", "")
+            es_recalculada = False
+
+            if caja is None:
+                res_det = gestor.detector.detectar(img)
+                if res_det.recuadro is not None:
+                    caja = res_det.recuadro
+                    origen = "recalculada"
+                    es_recalculada = True
+                else:
+                    origen = "sin_rostro"
+
+            recorte_b64 = ""
+            if caja is not None:
+                try:
+                    recorte = gestor.detector.recortar_con_margen_seguro(img, caja)
+                    if recorte is not None and recorte.size > 0:
+                        _, buf_rec = cv2.imencode(".jpg", recorte, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        recorte_b64 = base64.b64encode(buf_rec.tobytes()).decode("ascii")
+                except Exception as e_crop:
+                    print(f"[REVISION fotos_desc] Error al generar recorte para {identificador}: {e_crop}")
+
+            _, buf_img = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            b64_img = base64.b64encode(buf_img.tobytes()).decode("ascii")
+
+            return jsonify({
+                "status": "ok",
+                "identificador": identificador,
+                "persona": identificador,
+                "sesion": "fotos_desc",
+                "pose": "no_documentada",
+                "particion": fila_obj.get("particion", ""),
+                "tipo_sujeto": "desconocido",
+                "ruta": fila_obj["ruta"],
+                "ancho": w,
+                "alto": h,
+                "decision_humana": rev_info.get("decision", "pendiente"),
+                "estado_historico_detector": "UN_ROSTRO" if caja else "SIN_ROSTRO",
+                "caja": list(caja) if caja else None,
+                "origen_caja": origen,
+                "es_recalculada": es_recalculada,
+                "aviso_recalculada": "recalculada: puede diferir de la que apareció en vivo" if es_recalculada else "",
+                "imagen_base64": b64_img,
+                "recorte_base64": recorte_b64,
+            })
+
+        ruta_manifiesto = gestor.dir_ensayos / "manifiesto_ensayo.csv" if es_ensayo else gestor.dir_propio / "manifiesto.csv"
         manifiesto = ManifiestoDataset(ruta_manifiesto)
         reg = manifiesto.buscar_registro(identificador)
         if reg is None:
@@ -520,6 +764,9 @@ def crear_app(indice_inicial: int = 1) -> Flask:
         decision = str(data.get("decision", "")).strip().lower()
         caja = data.get("caja", None)
         es_ensayo = bool(data.get("es_ensayo", False))
+        entorno = str(data.get("entorno", "")).strip().lower()
+        if not entorno:
+            entorno = "ensayo" if es_ensayo else "real"
 
         if not identificador:
             return jsonify({"status": "error", "mensaje": "Se requiere 'identificador'."}), 400
@@ -527,7 +774,35 @@ def crear_app(indice_inicial: int = 1) -> Flask:
         if decision not in {"aprobada", "corregida", "excluida", "pendiente"}:
             return jsonify({"status": "error", "mensaje": f"Decisión '{decision}' inválida."}), 400
 
-        ruta_manifiesto = Path("data/ensayos/manifiesto_ensayo.csv") if es_ensayo else Path("data/propio/manifiesto.csv")
+        caja_tupla = tuple([int(c) for c in caja]) if (caja is not None and len(caja) == 4) else None
+
+        if entorno == "fotos_desc":
+            _, filas_u, revisiones_u, ruta_rev_u = _cargar_fotos_desc_y_revisiones()
+            fila_obj = next((f for f in filas_u if f["identificador"] == identificador), None)
+            if fila_obj is None:
+                return jsonify({"status": "error", "mensaje": f"Registro '{identificador}' no encontrado en fotos_desc."}), 404
+
+            origen_caja = "manual" if decision == "corregida" else (revisiones_u.get(identificador, {}).get("origen_caja") or "recalculada")
+            revisiones_u[identificador] = {
+                "decision": decision,
+                "caja": list(caja_tupla) if caja_tupla else revisiones_u.get(identificador, {}).get("caja"),
+                "origen_caja": origen_caja,
+            }
+            ruta_rev_u.parent.mkdir(parents=True, exist_ok=True)
+            tmp_rev = ruta_rev_u.with_suffix(".tmp")
+            tmp_rev.write_text(json.dumps(revisiones_u, indent=2, ensure_ascii=False), encoding="utf-8")
+            tmp_rev.replace(ruta_rev_u)
+
+            return jsonify({
+                "status": "ok",
+                "identificador": identificador,
+                "decision": decision,
+                "caja": list(caja_tupla) if caja_tupla else None,
+                "origen_caja": origen_caja,
+                "mensaje": f"Imagen '{identificador}' de fotos_desc actualizada como '{decision}'.",
+            })
+
+        ruta_manifiesto = gestor.dir_ensayos / "manifiesto_ensayo.csv" if es_ensayo else gestor.dir_propio / "manifiesto.csv"
         manifiesto = ManifiestoDataset(ruta_manifiesto)
         reg = manifiesto.buscar_registro(identificador)
         if reg is None:
@@ -547,5 +822,52 @@ def crear_app(indice_inicial: int = 1) -> Flask:
             "origen_caja": origen_caja,
             "mensaje": f"Captura '{identificador}' actualizada como '{decision}'."
         })
+
+    # =========================================================================
+    # API DE INSPECCIÓN VISUAL DE PREPROCESAMIENTO Y RASGOS FACIALES
+    # =========================================================================
+    @app.route("/api/pipeline/dataset_imagenes", methods=["GET"])
+    def api_pipeline_dataset_imagenes():
+        from reconocimiento.web.inspector_pipeline import listar_muestras_dataset_disponibles
+        raiz = Path(__file__).resolve().parents[3]
+        muestras = listar_muestras_dataset_disponibles(raiz=raiz)
+        return jsonify({"status": "ok", "muestras": muestras})
+
+    @app.route("/api/pipeline/inspeccionar_camara", methods=["POST"])
+    def api_pipeline_inspeccionar_camara():
+        from reconocimiento.web.inspector_pipeline import inspeccionar_fotograma_pipeline
+        ultimo = gestor.obtener_ultimo_fotograma()
+        if ultimo is None or getattr(ultimo, "frame_raw_bgr", None) is None:
+            return jsonify({
+                "status": "error",
+                "mensaje": "No hay fotograma activo en cámara. Inicia la cámara primero."
+            }), 400
+        res = inspeccionar_fotograma_pipeline(ultimo.frame_raw_bgr, gestor, origen_etiqueta="Cámara en Vivo")
+        return jsonify(res)
+
+    @app.route("/api/pipeline/inspeccionar_dataset", methods=["POST"])
+    def api_pipeline_inspeccionar_dataset():
+        from reconocimiento.web.inspector_pipeline import inspeccionar_fotograma_pipeline
+        data = request.get_json(silent=True) or {}
+        ruta_rel = str(data.get("ruta", "")).strip()
+        if not ruta_rel:
+            return jsonify({"status": "error", "mensaje": "Se requiere 'ruta'."}), 400
+
+        raiz = Path(__file__).resolve().parents[3].resolve()
+        ruta_abs = (raiz / ruta_rel).resolve()
+        try:
+            ruta_abs.relative_to(raiz)
+        except ValueError:
+            return jsonify({"status": "error", "mensaje": "Ruta fuera del proyecto no permitida."}), 403
+
+        if not ruta_abs.is_file():
+            return jsonify({"status": "error", "mensaje": f"Archivo no encontrado: {ruta_rel}"}), 404
+
+        img = cv2.imread(str(ruta_abs))
+        if img is None:
+            return jsonify({"status": "error", "mensaje": "No se pudo decodificar la imagen."}), 500
+
+        res = inspeccionar_fotograma_pipeline(img, gestor, origen_etiqueta=f"Dataset ({ruta_rel})")
+        return jsonify(res)
 
     return app

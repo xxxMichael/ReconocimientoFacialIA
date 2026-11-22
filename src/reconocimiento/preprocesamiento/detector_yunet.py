@@ -1,21 +1,34 @@
 """
 Detector facial basado en YuNet (red neuronal profunda ligera ONNX de OpenCV Zoo).
-Diseñado para manejar inclinaciones extremas (yaw, pitch, roll), variaciones de pose
-y condiciones de iluminación donde los clasificadores Haar tienden a perder el rostro
-o engancharse falsamente en texturas de ropa o pelo.
+Diseñado para manejar inclinaciones extremas (yaw, pitch, roll), variaciones de pose,
+fotogramas rotados (0°, 90°, 180°, 270°) y alineación facial por similitud.
 """
 from pathlib import Path
-from typing import List, Optional, Tuple
+from threading import Lock
+from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
 from reconocimiento.preprocesamiento.detector import EstadoDeteccion, ResultadoDeteccion
+from reconocimiento.preprocesamiento.orientacion import (
+    ORIENTACIONES_VALIDAS,
+    DeteccionOrientada,
+    calcular_iou_y_iomin,
+    fusionar_detecciones_multiorientacion,
+    rotar_fotograma,
+    transformar_puntos_a_original,
+    transformar_recuadro_a_original,
+)
+from reconocimiento.preprocesamiento.alineador import alinear_rostro
 
 
 class DetectorYuNet:
     """
     Detector facial basado en YuNet (OpenCV DNN / FaceDetectorYN).
-    Soporta giros laterales, inclinaciones verticales y ladeos de cabeza.
+    Soporta:
+      - Detección estándar a 0° (configuración de referencia).
+      - Detección multi-orientación configurable (0°, 90°, 180°, 270°) con fusión de duplicados.
+      - Alineación facial por similitud 2D hacia plantilla canónica de 5 puntos.
     """
 
     def __init__(
@@ -23,14 +36,38 @@ class DetectorYuNet:
         ruta_modelo: Optional[str] = None,
         score_threshold: float = 0.6,
         nms_threshold: float = 0.3,
-        margen_expansion: float = 0.1
+        margen_expansion: float = 0.1,
+        orientaciones: Optional[Tuple[int, ...]] = None,
+        modo_multiorientacion: str = "estandar",
+        alinear_rostro: bool = False,
+        metodo_remuestreo: str = "estandar",
     ):
+        self._lock = Lock()
         self.score_threshold = score_threshold
         self.nms_threshold = nms_threshold
         self.margen_expansion = margen_expansion
+        self.modo_multiorientacion = modo_multiorientacion.lower()
+        self.alinear_rostro = alinear_rostro
+        self.metodo_remuestreo = metodo_remuestreo
+
+        # Configurar lista de orientaciones según el modo
+        if orientaciones is not None:
+            self.orientaciones = tuple(orientaciones)
+        elif self.modo_multiorientacion == "estandar":
+            self.orientaciones = (0,)
+        elif self.modo_multiorientacion == "fijo_90":
+            self.orientaciones = (90,)
+        elif self.modo_multiorientacion == "fijo_180":
+            self.orientaciones = (180,)
+        elif self.modo_multiorientacion == "fijo_270":
+            self.orientaciones = (270,)
+        elif self.modo_multiorientacion in ("cascada", "auto", "exhaustivo"):
+            self.orientaciones = (0, 90, 180, 270)
+        else:
+            self.orientaciones = (0,)
 
         if ruta_modelo is None:
-            ruta_defecto = Path("modelos/detector/face_detection_yunet_2023mar.onnx")
+            ruta_defecto = Path(__file__).resolve().parents[3] / "modelos/detector/face_detection_yunet_2023mar.onnx"
             ruta_modelo = str(ruta_defecto)
 
         self.ruta_modelo = Path(ruta_modelo)
@@ -52,32 +89,70 @@ class DetectorYuNet:
         box_b: Tuple[int, int, int, int]
     ) -> Tuple[float, float]:
         """Calcula Intersection-over-Union (IoU) y Intersection-over-Minimum (IoMin)."""
-        x1_a, y1_a, w_a, h_a = box_a
-        x1_b, y1_b, w_b, h_b = box_b
+        return calcular_iou_y_iomin(box_a, box_b)
 
-        x2_a, y2_a = x1_a + w_a, y1_a + h_a
-        x2_b, y2_b = x1_b + w_b, y1_b + h_b
+    def _detectar_en_angulo(
+        self,
+        img_bgr: np.ndarray,
+        angulo: int,
+        h_orig: int,
+        w_orig: int
+    ) -> List[DeteccionOrientada]:
+        """Ejecuta inferencia YuNet sobre una rotación específica y transforma las coordenadas."""
+        rotada = rotar_fotograma(img_bgr, angulo)
+        h_r, w_r = rotada.shape[:2]
 
-        inter_x1 = max(x1_a, x1_b)
-        inter_y1 = max(y1_a, y1_b)
-        inter_x2 = min(x2_a, x2_b)
-        inter_y2 = min(y2_a, y2_b)
+        with self._lock:
+            self.detector.setInputSize((w_r, h_r))
+            _, caras = self.detector.detect(rotada)
 
-        inter_w = max(0, inter_x2 - inter_x1)
-        inter_h = max(0, inter_y2 - inter_y1)
-        inter_area = inter_w * inter_h
+        if caras is None or len(caras) == 0:
+            return []
 
-        if inter_area <= 0:
-            return 0.0, 0.0
+        detecciones: List[DeteccionOrientada] = []
+        for c in caras:
+            score = float(c[14]) if len(c) > 14 else 1.0
+            bx_r, by_r, bw_r, bh_r = int(round(c[0])), int(round(c[1])), int(round(c[2])), int(round(c[3]))
 
-        area_a = w_a * h_a
-        area_b = w_b * h_b
-        union_area = area_a + area_b - inter_area
-        min_area = min(area_a, area_b)
+            # Clamping en imagen rotada
+            x2_r, y2_r = min(w_r, bx_r + bw_r), min(h_r, by_r + bh_r)
+            bx_r, by_r = max(0, bx_r), max(0, by_r)
+            bw_r, bh_r = x2_r - bx_r, y2_r - by_r
+            if bw_r < 20 or bh_r < 20:
+                continue
 
-        iou = inter_area / union_area if union_area > 0 else 0.0
-        iomin = inter_area / min_area if min_area > 0 else 0.0
-        return float(iou), float(iomin)
+            # Transformar recuadro de vuelta a las coordenadas originales
+            box_orig = transformar_recuadro_a_original(
+                (bx_r, by_r, bw_r, bh_r), angulo, h_orig, w_orig
+            )
+
+            # Transformar los 5 puntos faciales de vuelta a las coordenadas originales (si están presentes)
+            if len(c) >= 14:
+                pts_r = np.array([c[4:6], c[6:8], c[8:10], c[10:12], c[12:14]], dtype=np.float32)
+                pts_orig = transformar_puntos_a_original(pts_r, angulo, h_orig, w_orig)
+            else:
+                cx = box_orig[0] + box_orig[2] * 0.5
+                cy = box_orig[1] + box_orig[3] * 0.5
+                wb, hb = float(box_orig[2]), float(box_orig[3])
+                pts_orig = np.array([
+                    [cx - wb * 0.18, cy - hb * 0.12],
+                    [cx + wb * 0.18, cy - hb * 0.12],
+                    [cx, cy + hb * 0.05],
+                    [cx - wb * 0.14, cy + hb * 0.22],
+                    [cx + wb * 0.14, cy + hb * 0.22],
+                ], dtype=np.float32)
+
+            detecciones.append(
+                DeteccionOrientada(
+                    recuadro_original=box_orig,
+                    puntos_original=pts_orig,
+                    score=score,
+                    angulo_deteccion=angulo,
+                    recuadro_rotado=(bx_r, by_r, bw_r, bh_r)
+                )
+            )
+
+        return detecciones
 
     def detectar(
         self,
@@ -85,7 +160,10 @@ class DetectorYuNet:
         es_pre_recortada: bool = False,
         recuadros_simulados: Optional[list] = None
     ) -> ResultadoDeteccion:
-        """Localiza rostros en la imagen usando YuNet."""
+        """
+        Localiza rostros en la imagen usando YuNet.
+        Soporta modos estándar (0°), cascada progresiva (0° -> 90°/270°/180°) y exhaustivo.
+        """
         if recuadros_simulados is not None:
             n_rostros = len(recuadros_simulados)
             if n_rostros == 0:
@@ -136,38 +214,37 @@ class DetectorYuNet:
         else:
             img_bgr = imagen
 
-        h, w = img_bgr.shape[:2]
-        self.detector.setInputSize((w, h))
+        h_orig, w_orig = img_bgr.shape[:2]
 
-        _, caras = self.detector.detect(img_bgr)
+        # Estrategia de detección según modo configurado
+        todas_detecciones: List[DeteccionOrientada] = []
 
-        if caras is None or len(caras) == 0:
-            return ResultadoDeteccion(
-                estado=EstadoDeteccion.SIN_ROSTRO,
-                recuadro=None,
-                total_rostros_detectados=0,
-                mensaje="No se localizó ningún rostro con YuNet."
-            )
+        if self.modo_multiorientacion in ("cascada", "auto"):
+            # Paso 1: Intentar primero en 0° (caso común, coste de 1 inferencia)
+            dets_0 = self._detectar_en_angulo(img_bgr, 0, h_orig, w_orig)
+            if dets_0:
+                todas_detecciones = dets_0
+            else:
+                # Paso 2: Si no detecta en 0°, evaluar las orientaciones restantes
+                for ang in (90, 270, 180):
+                    dets_ang = self._detectar_en_angulo(img_bgr, ang, h_orig, w_orig)
+                    todas_detecciones.extend(dets_ang)
+        else:
+            # Modo explícito: evaluar la lista de orientaciones configurada
+            for ang in self.orientaciones:
+                dets_ang = self._detectar_en_angulo(img_bgr, ang, h_orig, w_orig)
+                todas_detecciones.extend(dets_ang)
 
-        # Filtrar recuadros válidos con dimensiones positivas
-        recuadros_validos: List[Tuple[int, int, int, int]] = []
-        for c in caras:
-            bx, by, bw, bh = int(round(c[0])), int(round(c[1])), int(round(c[2])), int(round(c[3]))
-            # Clamping a los límites de la imagen
-            bx = max(0, min(bx, w - 1))
-            by = max(0, min(by, h - 1))
-            bw = max(1, min(bw, w - bx))
-            bh = max(1, min(bh, h - by))
-            if bw >= 20 and bh >= 20:
-                recuadros_validos.append((bx, by, bw, bh))
+        # Fusionar detecciones duplicadas del mismo rostro
+        rostros_unicos = fusionar_detecciones_multiorientacion(todas_detecciones)
 
-        n_rostros = len(recuadros_validos)
+        n_rostros = len(rostros_unicos)
         if n_rostros == 0:
             return ResultadoDeteccion(
                 estado=EstadoDeteccion.SIN_ROSTRO,
                 recuadro=None,
                 total_rostros_detectados=0,
-                mensaje="No se localizó ningún rostro con dimensiones válidas."
+                mensaje="No se localizó ningún rostro con YuNet."
             )
         elif n_rostros > 1:
             return ResultadoDeteccion(
@@ -177,15 +254,35 @@ class DetectorYuNet:
                 mensaje=f"Se detectaron {n_rostros} rostros en la escena con YuNet."
             )
 
-        x, y, w, h = recuadros_validos[0]
+        # Exactamente UN_ROSTRO
+        det = rostros_unicos[0]
+        x, y, w, h = det.recuadro_original
         recorte_seguro = self.recortar_con_margen_seguro(imagen, (x, y, w, h))
+
+        recorte_al = None
+        meta_al = None
+        if self.alinear_rostro:
+            recorte_al, meta_obj = alinear_rostro(
+                imagen=imagen,
+                puntos_faciales=det.puntos_original,
+                recuadro=(x, y, w, h),
+                resolucion=(64, 64),
+                metodo_remuestreo=self.metodo_remuestreo,
+            )
+            meta_al = meta_obj.a_diccionario()
+            meta_al["angulo_orientacion_detector"] = det.angulo_deteccion
 
         return ResultadoDeteccion(
             estado=EstadoDeteccion.UN_ROSTRO,
             recuadro=(x, y, w, h),
             total_rostros_detectados=1,
             rostro_recortado=recorte_seguro,
-            mensaje="Rostro único detectado y recortado correctamente con YuNet."
+            mensaje=f"Rostro único detectado (orientación: {det.angulo_deteccion}°, score: {det.score:.2f}).",
+            puntos_faciales=det.puntos_original,
+            angulo_orientacion=det.angulo_deteccion,
+            confianza_deteccion=det.score,
+            recorte_alineado=recorte_al,
+            metadatos_alineacion=meta_al
         )
 
     def recortar_con_margen_seguro(

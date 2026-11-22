@@ -14,13 +14,16 @@
         <span class="header-subtitle">Panel Web de Adquisición y Control de Acceso</span>
       </div>
 
-      <!-- Pestañas Principales: Captura vs Revisar Capturas -->
+      <!-- Pestañas Principales: Captura vs Revisar Capturas vs Preprocesamiento y Rasgos -->
       <div class="header-nav-tabs">
         <button type="button" id="tab-nav-camara" class="btn-nav-tab active">
           📸 Captura y Acceso
         </button>
         <button type="button" id="tab-nav-revision" class="btn-nav-tab">
           🔍 Revisar Capturas
+        </button>
+        <button type="button" id="tab-nav-pipeline" class="btn-nav-tab">
+          🔬 Preprocesamiento y Rasgos
         </button>
       </div>
 
@@ -108,18 +111,15 @@
           <div class="form-row-inline">
             <label for="select-modelo-recon">Modelo Activo:</label>
             <select id="select-modelo-recon" class="form-control-inline">
-              <option value="cnn" selected>CNN (Red Convolucional - Recomendado)</option>
-              <option value="ann">ANN (Red Densa)</option>
-              <option value="svm">SVM (Máquina Vectores Soporte)</option>
-              <option value="arbol">Árbol de Decisión</option>
-              <option value="knn">KNN (K-Nearest Neighbors)</option>
+              <option value="cnn_estandar_portal_061" selected>CNN Estándar Portal Completo — 0.61 (Principal)</option>
+              <option value="cnn_antialiasing_052">CNN Antialiasing — 0.52 (Comparación)</option>
             </select>
             <button id="btn-cambiar-modelo" class="btn btn-secondary btn-sm">Cargar</button>
           </div>
           <div class="form-row-inline" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
             <label for="slider-umbral">Regla de Rechazo (Umbral):</label>
-            <input type="range" id="slider-umbral" min="10" max="99" value="65" class="slider-control">
-            <span id="lbl-umbral-valor"><strong>65%</strong></span>
+            <input type="range" id="slider-umbral" min="10" max="99" value="61" class="slider-control">
+            <span id="lbl-umbral-valor"><strong>61%</strong></span>
           </div>
           <small style="color: var(--text-muted); display: block; margin-top: 4px;">
             Si la confianza es inferior a este umbral o la persona es desconocida, la puerta permanece estrictamente <strong>CERRADA</strong>.
@@ -177,7 +177,15 @@
       <!-- Configuración de Sesión y Sujeto -->
       <div class="form-grid-compact">
         <div class="form-group-compact">
-          <label for="select-persona">Persona:</label>
+          <label for="select-tipo-sujeto">Tipo de Sujeto:</label>
+          <select id="select-tipo-sujeto" class="form-control-compact">
+            <option value="autorizado" selected>autorizado</option>
+            <option value="desconocido">desconocido</option>
+          </select>
+        </div>
+
+        <div class="form-group-compact" id="grp-persona-autorizada">
+          <label for="select-persona">Persona Autorizada:</label>
           <select id="select-persona" class="form-control-compact">
             <option value="persona_1">persona_1</option>
             <option value="persona_2">persona_2</option>
@@ -185,22 +193,40 @@
           </select>
         </div>
 
-        <div class="form-group-compact">
-          <label for="select-sesion">Sesión:</label>
-          <select id="select-sesion" class="form-control-compact">
-            <option value="sesion_01" selected>sesion_01 (Entrenamiento)</option>
-            <option value="sesion_02">sesion_02 (Entrenamiento)</option>
-            <option value="sesion_03">sesion_03 (Entrenamiento)</option>
-            <option value="sesion_04">sesion_04 (Validación)</option>
-            <option value="sesion_05">sesion_05 (Prueba)</option>
+        <div class="form-group-compact" id="grp-persona-externa" style="display: none;">
+          <label for="input-persona-externa">Identificador Externo:</label>
+          <input type="text" id="input-persona-externa" class="form-control-compact" placeholder="ej. externo_001" value="externo_001">
+        </div>
+
+        <div class="form-group-compact" id="grp-grupo-container" style="display: none;">
+          <label for="select-grupo">Grupo Experimental:</label>
+          <select id="select-grupo" class="form-control-compact">
+            <option value="desconocidos_ajuste">desconocidos_ajuste (Entrenamiento)</option>
+            <option value="desconocidos_calibracion" selected>desconocidos_calibracion (Validación)</option>
+            <option value="desconocidos_prueba">desconocidos_prueba (Prueba)</option>
+          </select>
+        </div>
+
+        <div class="form-group-compact" id="grp-distancia-container">
+          <label for="select-distancia">Distancia Física:</label>
+          <select id="select-distancia" class="form-control-compact">
+            <option value="cercana">cercana (Plano Cercano)</option>
+            <option value="media" selected>media (Plano Medio)</option>
+            <option value="lejana">lejana (Plano Lejano)</option>
           </select>
         </div>
 
         <div class="form-group-compact">
-          <label for="select-tipo-sujeto">Tipo:</label>
-          <select id="select-tipo-sujeto" class="form-control-compact">
-            <option value="autorizado" selected>autorizado</option>
-            <option value="desconocido">desconocido</option>
+          <label for="select-sesion">Sesión:</label>
+          <select id="select-sesion" class="form-control-compact">
+            <option value="sesion_01" selected>sesion_01</option>
+            <option value="sesion_02">sesion_02</option>
+            <option value="sesion_03">sesion_03</option>
+            <option value="sesion_04">sesion_04</option>
+            <option value="sesion_05">sesion_05</option>
+            <option value="sesion_cercana">sesion_cercana (Plano Cercano)</option>
+            <option value="sesion_media">sesion_media (Plano Medio)</option>
+            <option value="sesion_lejana">sesion_lejana (Plano Lejano)</option>
           </select>
         </div>
 
@@ -211,6 +237,7 @@
             <option value="validacion">validacion</option>
             <option value="prueba">prueba</option>
           </select>
+          <small id="particion-ayuda" class="protocol-help-text" style="font-size: 0.72rem; color: var(--color-primary); display: block; margin-top: 3px; font-weight: 500;"></small>
         </div>
       </div>
 
@@ -229,8 +256,13 @@
         </div>
       </div>
 
-      <!-- Consentimiento implícito (activo de forma transparente) -->
-      <input type="hidden" id="chk-consentimiento" checked>
+      <!-- Consentimiento Informado Explícito y Visible (Desmarcado Inicialmente) -->
+      <div class="consent-container" style="margin-top: 10px; margin-bottom: 10px; padding: 10px 14px; background: rgba(234, 179, 8, 0.08); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 6px; display: flex; align-items: flex-start; gap: 10px;">
+        <input type="checkbox" id="chk-consentimiento" style="margin-top: 4px; width: 17px; height: 17px; cursor: pointer;">
+        <label for="chk-consentimiento" style="font-size: 0.85rem; line-height: 1.4; cursor: pointer; color: var(--text-color);">
+          <strong>Consentimiento Informado Explícito:</strong> Confirmo que el sujeto/voluntario fue informado de los fines académicos del proyecto y autoriza voluntariamente la captura y procesamiento de sus imágenes faciales.
+        </label>
+      </div>
 
       <!-- Progreso de la sesión integrado directamente al lado del video -->
       <div class="session-progress-compact">
@@ -275,8 +307,14 @@
             <div class="frozen-meta-details">
               <div>Fotograma: <strong id="lbl-congelado-frame">#0</strong></div>
               <div>Estado Detector: <strong id="lbl-congelado-estado">UN_ROSTRO</strong></div>
+              <div>Tipo Sujeto: <strong id="lbl-congelado-tipo-sujeto">autorizado</strong></div>
+              <div>Sujeto / Identidad: <strong id="lbl-congelado-persona">persona_1</strong></div>
+              <div id="box-congelado-grupo" style="display: none;">Grupo: <strong id="lbl-congelado-grupo">-</strong></div>
+              <div>Distancia: <strong id="lbl-congelado-distancia">media</strong></div>
+              <div>Sesión: <strong id="lbl-congelado-sesion">sesion_01</strong></div>
               <div>Pose: <strong id="lbl-congelado-pose">frontal</strong></div>
-              <div>Sujeto: <strong id="lbl-congelado-persona">persona_1</strong></div>
+              <div>Partición: <strong id="lbl-congelado-particion">entrenamiento</strong></div>
+              <div>Consentimiento: <strong id="lbl-congelado-consentimiento">No</strong></div>
               <div id="lbl-congelado-aviso-dibujo" style="color: var(--color-warning); font-size: 0.8rem; display: none;">
                 ✏️ Modo corrección activo: arrastra sobre la foto para dibujar la caja correcta.
               </div>
@@ -305,12 +343,41 @@
     <!-- Barra de Filtros -->
     <div class="revision-filter-bar">
       <div class="filter-item">
-        <label for="rev-filter-persona">Persona:</label>
+        <label for="rev-filter-tipo-sujeto">Tipo Sujeto:</label>
+        <select id="rev-filter-tipo-sujeto" class="filter-select">
+          <option value="todas">Todos</option>
+          <option value="autorizado">autorizado</option>
+          <option value="desconocido">desconocido</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-persona">Persona / ID:</label>
         <select id="rev-filter-persona" class="filter-select">
           <option value="todas">Todas</option>
           <option value="persona_1">persona_1</option>
           <option value="persona_2">persona_2</option>
           <option value="persona_3">persona_3</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-grupo">Grupo:</label>
+        <select id="rev-filter-grupo" class="filter-select">
+          <option value="todas">Todos</option>
+          <option value="desconocidos_ajuste">desconocidos_ajuste</option>
+          <option value="desconocidos_calibracion">desconocidos_calibracion</option>
+          <option value="desconocidos_prueba">desconocidos_prueba</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label for="rev-filter-distancia">Distancia:</label>
+        <select id="rev-filter-distancia" class="filter-select">
+          <option value="todas">Todas</option>
+          <option value="cercana">cercana</option>
+          <option value="media">media</option>
+          <option value="lejana">lejana</option>
         </select>
       </div>
 
@@ -323,6 +390,9 @@
           <option value="sesion_03">sesion_03</option>
           <option value="sesion_04">sesion_04</option>
           <option value="sesion_05">sesion_05</option>
+          <option value="sesion_cercana">sesion_cercana</option>
+          <option value="sesion_media">sesion_media</option>
+          <option value="sesion_lejana">sesion_lejana</option>
         </select>
       </div>
 
@@ -364,6 +434,7 @@
         <select id="rev-filter-entorno" class="filter-select">
           <option value="real" selected>Sesión Real (data/propio/)</option>
           <option value="ensayo">Ensayo (data/ensayos/)</option>
+          <option value="fotos_desc">Desconocidos Universidad (fotos_desc)</option>
         </select>
       </div>
 
@@ -467,6 +538,154 @@
           </div>
         </div>
       </main>
+    </div>
+  </section>
+
+  <!-- Vista 3: Inspector Visual de Preprocesamiento y Rasgos Faciales -->
+  <section class="pipeline-layout hidden" id="pipeline-layout">
+    <div class="card pipeline-toolbar-card">
+      <div class="card-header">
+        <h2>🔬 Inspector de Preprocesamiento y Rasgos Faciales (4 Fases)</h2>
+        <span id="badge-pipeline-origen" class="badge badge-info">Esperando análisis...</span>
+      </div>
+      <div class="pipeline-controls-bar">
+        <div class="pipeline-source-box">
+          <strong>📷 Desde Cámara en Vivo:</strong>
+          <div class="pipeline-source-actions">
+            <button type="button" id="btn-inspeccionar-camara" class="btn btn-primary btn-sm">Analizar Fotograma Actual</button>
+            <label class="pipeline-auto-label">
+              <input type="checkbox" id="chk-pipeline-auto"> Auto-actualizar (1.5s)
+            </label>
+          </div>
+        </div>
+
+        <div class="pipeline-source-box">
+          <strong>🗂️ Desde Imágenes del Dataset:</strong>
+          <div class="pipeline-source-actions">
+            <select id="select-dataset-muestra" class="form-control-inline" style="min-width: 260px;">
+              <option value="">Cargando muestras del dataset...</option>
+            </select>
+            <button type="button" id="btn-inspeccionar-dataset" class="btn btn-secondary btn-sm">Analizar Imagen</button>
+          </div>
+        </div>
+      </div>
+      <div id="pipeline-status-msg" class="pipeline-status-msg hidden"></div>
+    </div>
+
+    <div class="pipeline-phases-grid">
+      <!-- Fase 1: Adquisición y Detección Facial -->
+      <div class="card pipeline-phase-card">
+        <div class="card-header">
+          <h3>1. Detección Facial (YuNet)</h3>
+          <span id="lbl-pipe-estado-det" class="badge badge-sin-rostro">—</span>
+        </div>
+        <div class="pipeline-img-wrap">
+          <img id="img-pipe-deteccion" src="" alt="Detección YuNet y Landmarks" class="pipeline-img">
+        </div>
+        <div class="pipeline-meta-list">
+          <span>Rostros: <strong id="lbl-pipe-rostros">0</strong></span>
+          <span>Orientación: <strong id="lbl-pipe-angulo">0°</strong></span>
+          <span>Recuadro: <strong id="lbl-pipe-recuadro">—</strong></span>
+        </div>
+        <p class="pipeline-hint">Puntos clave: OD (Ojo Der.), OI (Ojo Izq.), N (Nariz), BD/BI (Comisuras).</p>
+      </div>
+
+      <!-- Fase 2: Preprocesamiento -->
+      <div class="card pipeline-phase-card">
+        <div class="card-header">
+          <h3>2. Preprocesamiento Facial</h3>
+          <span id="lbl-pipe-metodo-prep" class="badge badge-info">—</span>
+        </div>
+        <div class="pipeline-prep-trio">
+          <div class="prep-step">
+            <img id="img-pipe-recorte-usado" src="" alt="Extracción Facial" class="pipeline-thumb">
+            <span id="lbl-pipe-recorte-titulo">Región Extraída</span>
+          </div>
+          <div class="prep-step">
+            <img id="img-pipe-gris-64" src="" alt="Escala de Grises 64x64" class="pipeline-thumb">
+            <span>Gris 64×64 (Antialiasing)</span>
+          </div>
+          <div class="prep-step">
+            <img id="img-pipe-gaussiano-64" src="" alt="Filtro Gaussiano" class="pipeline-thumb">
+            <span>Gaussiano <span id="lbl-pipe-kernel-gauss">5×5</span> (σ=<span id="lbl-pipe-sigma-gauss">0.5</span>)</span>
+          </div>
+          <div class="prep-step">
+            <img id="img-pipe-diff-gaussiano" src="" alt="Residual Paso-Bajo" class="pipeline-thumb">
+            <span>Residual Filtro (×8)</span>
+          </div>
+        </div>
+        <div class="pipeline-meta-list" id="lbl-pipe-stats-tensor">
+          <span>Forma: <strong>64×64 float32</strong></span>
+          <span>Rango: <strong>[0.0, 1.0]</strong></span>
+        </div>
+        <p class="pipeline-hint" id="lbl-pipe-alin-info">Conversión BGR→Gris, normalización 64×64 (INTER_AREA/LINEAR), suavizado paso-bajo gaussiano y escalado [0, 1].</p>
+      </div>
+
+      <!-- Fase 3: Rasgos Faciales -->
+      <div class="card pipeline-phase-card pipeline-phase-wide">
+        <div class="card-header">
+          <h3>3. Identificación de Rasgos Faciales para el Reconocimiento</h3>
+          <span id="badge-pipe-extractor-activo" class="badge badge-info">—</span>
+        </div>
+
+        <!-- Contenedor exclusivo para CNN (3 bloques convolucionales reales) -->
+        <div class="pipeline-features-grid hidden" id="contenedor-rasgos-cnn" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="feature-panel">
+            <h4>Bloque 1: 16 Filtros (32×32)</h4>
+            <img id="img-pipe-cnn-b1" src="" alt="Activaciones CNN Bloque 1" class="pipeline-thumb-lg">
+            <p class="pipeline-hint">Conv 3×3 + BatchNorm + ReLU + MaxPool 2×2. Detecta bordes, cejas y contornos.</p>
+          </div>
+          <div class="feature-panel">
+            <h4>Bloque 2: Top 16/32 Filtros (16×16)</h4>
+            <img id="img-pipe-cnn-b2" src="" alt="Activaciones CNN Bloque 2" class="pipeline-thumb-lg">
+            <p class="pipeline-hint">Conv 3×3 + BatchNorm + ReLU + MaxPool 2×2. Combina rasgos locales (ojos, nariz, boca).</p>
+          </div>
+          <div class="feature-panel">
+            <h4>Bloque 3: Top 16/64 Filtros (8×8)</h4>
+            <img id="img-pipe-cnn-b3" src="" alt="Activaciones CNN Bloque 3" class="pipeline-thumb-lg">
+            <p class="pipeline-hint">Conv 3×3 + BatchNorm + ReLU + MaxPool 2×2 → Flatten (4096 dims) para FC1/FC2.</p>
+          </div>
+        </div>
+
+        <!-- Contenedor exclusivo para modelos de textura (Árbol, KNN, SVM, ANN) -->
+        <div class="pipeline-features-grid hidden" id="contenedor-rasgos-textura" style="grid-template-columns: repeat(2, 1fr);">
+          <div class="feature-panel">
+            <h4>Cuadrícula 4×4 (Regiones R1–R16)</h4>
+            <img id="img-pipe-cuadricula" src="" alt="Cuadrícula 4x4" class="pipeline-thumb-lg">
+            <p class="pipeline-hint">Divide el tensor 64×64 en 16 regiones de 16×16 px.</p>
+          </div>
+          <div class="feature-panel">
+            <h4>Histogramas Regionales (256 dims)</h4>
+            <img id="img-pipe-heatmap" src="" alt="Histogramas Regionales" class="pipeline-thumb-lg">
+            <p class="pipeline-hint">16 regiones × 16 bins (Norma L2: <strong id="lbl-pipe-norma-l2">—</strong>) usado por Árbol/KNN/SVM/ANN.</p>
+          </div>
+        </div>
+
+        <!-- Contenedor cuando no hay modelo activo -->
+        <div class="pipeline-hint hidden" id="contenedor-rasgos-ninguno" style="padding: 20px; text-align: center;">
+          No hay ningún clasificador activo habilitado para extraer rasgos de clasificación.
+        </div>
+      </div>
+
+      <!-- Fase 4: Clasificación y Regla de Acceso -->
+      <div class="card pipeline-phase-card pipeline-phase-wide">
+        <div class="card-header">
+          <h3>4. Clasificación y Regla de Decisión</h3>
+          <span id="badge-pipe-puerta" class="badge badge-door-closed">PUERTA CERRADA</span>
+        </div>
+        <div class="pipeline-classif-grid">
+          <div class="classif-summary">
+            <div>Modelo Activo: <strong id="lbl-pipe-modelo">—</strong></div>
+            <div>Umbral Exigido: <strong id="lbl-pipe-umbral">—</strong></div>
+            <div>Predicción (Argmax): <strong id="lbl-pipe-argmax">—</strong></div>
+            <div>Score Máximo: <strong id="lbl-pipe-score">—</strong></div>
+            <div>Motivo: <strong id="lbl-pipe-motivo">—</strong></div>
+          </div>
+          <div class="classif-probs" id="box-pipe-probs">
+            <!-- Barras de probabilidad generadas dinámicamente -->
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 

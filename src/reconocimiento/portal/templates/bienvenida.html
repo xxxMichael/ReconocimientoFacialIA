@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal de Captura - Reconocimiento Facial</title>
+  <link rel="stylesheet" href="/static/portal.css">
+</head>
+<body>
+  <div class="contenedor-centrado">
+    <div class="tarjeta-bienvenida">
+      <div class="logo-circulo">📷</div>
+      <h1>Portal de Captura de Voluntarios</h1>
+      <p class="subtitulo">Estudio Académico de Reconocimiento Facial - IA 2</p>
+
+      <div class="aviso-info">
+        <strong>Acceso Mediante Invitación Privada</strong>
+        <p>Para ingresar y participar en la sesión de captura fotográfica, debe utilizar el enlace personal que le proporcionó el equipo de investigación.</p>
+      </div>
+
+      <form action="/" method="GET" class="formulario-token">
+        <label for="input-token">¿Dispone de un código o token de invitación?</label>
+        <div class="fila-input">
+          <input type="text" id="input-token" name="token" placeholder="Ingrese su código de invitación" required autocomplete="off">
+          <button type="submit" class="btn-primario">Acceder</button>
+        </div>
+      </form>
+
+      <div class="pie-tarjeta">
+        <p>🔒 Conexión segura y anónima. No se almacenan datos personales identificables.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

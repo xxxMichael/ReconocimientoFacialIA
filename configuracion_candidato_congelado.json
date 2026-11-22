@@ -1,0 +1,67 @@
+{
+  "candidato": {
+    "identificador": "cnn_4clases_desarrollo_congelado",
+    "nombre": "CNN 4 Clases (Desarrollo Corregido)",
+    "tipo_clasificador": "ClasificadorCNN",
+    "ruta_modelo": "resultados/desarrollo_4clases_corregido_20261119_123602/cnn/modelo.pt",
+    "sha256_modelo": "773f354628ebf09e6050e0129503113f4bbe5b7187b7eb7d3461f9bd85aaaec9",
+    "arquitectura": "CNN (conv1: 1->16, k=3, s=1, p=1; maxpool 2x2; conv2: 16->32, k=3, s=1, p=1; maxpool 2x2; fc1: 32*16*16->128; fc2: 128->4; softmax)",
+    "orden_clases": [
+      "persona_1",
+      "persona_2",
+      "persona_3",
+      "desconocido"
+    ],
+    "mapeo_clases": {
+      "0": "persona_1",
+      "1": "persona_2",
+      "2": "persona_3",
+      "3": "desconocido"
+    },
+    "personas_autorizadas": [
+      "persona_1",
+      "persona_2",
+      "persona_3"
+    ],
+    "umbral_score": 0.46,
+    "criterio_seleccion_umbral": "Seleccionado exclusivamente en desarrollo sobre Sesion 04 (64 intentos autorizados) y calibracion LFW (100 intentos desconocidos) bajo criterio jerarquico de Regla B: 1) menor FAR (1.00%), 2) menor FRR puerta (0.00%), 3) mayor aperturas correctas (64/64), 4) mayor umbral."
+  },
+  "detector_facial": {
+    "nombre": "DetectorYuNet",
+    "ruta_modelo": "modelos/detector/face_detection_yunet_2023mar.onnx",
+    "sha256_modelo": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "parametros": {
+      "score_threshold": 0.6,
+      "nms_threshold": 0.3,
+      "margen_expansion": 0.1
+    }
+  },
+  "preprocesamiento": {
+    "escala_grises": "cv2.COLOR_BGR2GRAY",
+    "resolucion": [64, 64],
+    "interpolacion": "cv2.INTER_AREA",
+    "normalizacion_intensidades": "float32_0_1 (division por 255.0)",
+    "suavizado_gaussiano": {
+      "sigma": 0.5,
+      "ksize": [0, 0]
+    }
+  },
+  "conjuntos_desarrollo_utilizados": {
+    "autorizados_entrenamiento": "Sesiones 01, 02, 03 y multidistancia de persona_1 (268 imagenes)",
+    "desconocidos_entrenamiento": "LFW 300 identidades unicas en data/desconocidos_lfw/entrenamiento_4clases/manifiesto.csv",
+    "autorizados_calibracion_umbral": "Sesion 04 multidistancia (64 imagenes: 24 p1, 20 p2, 20 p3)",
+    "desconocidos_calibracion_umbral": "LFW calibracion 100 identidades en data/desconocidos_lfw/calibracion/manifiesto.csv"
+  },
+  "regla_acceso": {
+    "descripcion": "Abrir unicamente si: 1) exactamente un rostro detectado (UN_ROSTRO), 2) procesamiento exitoso, 3) clase argmax pertenece a personas_autorizadas (desconocido nunca habilita acceso), y 4) score >= 0.46. En cualquier otro caso, la puerta permanece CERRADA.",
+    "modulo_implementacion": "reconocimiento.clasificacion.regla_acceso",
+    "funcion_canonica": "evaluar_regla_acceso_completa"
+  },
+  "versiones_entorno": {
+    "python": "3.14.3",
+    "opencv": "4.13.0",
+    "torch": "2.12.0+cpu",
+    "numpy": "2.4.3",
+    "scikit_learn": "1.8.0"
+  }
+}

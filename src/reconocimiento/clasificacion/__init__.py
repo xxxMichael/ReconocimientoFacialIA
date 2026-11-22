@@ -18,6 +18,11 @@ from reconocimiento.clasificacion.regla_acceso import (
     ETIQUETAS_DESCONOCIDO_RESERVADAS,
     evaluar_decision_acceso,
 )
+from reconocimiento.clasificacion.rechazo_distancia import (
+    BancoReferencias,
+    evaluar_decision_acceso_con_distancia,
+    METRICAS_VALIDAS,
+)
 
 __all__ = [
     "ClasificadorFacialBase",
@@ -32,4 +37,7 @@ __all__ = [
     "DecisionAcceso",
     "ETIQUETAS_DESCONOCIDO_RESERVADAS",
     "evaluar_decision_acceso",
+    "BancoReferencias",
+    "evaluar_decision_acceso_con_distancia",
+    "METRICAS_VALIDAS",
 ]

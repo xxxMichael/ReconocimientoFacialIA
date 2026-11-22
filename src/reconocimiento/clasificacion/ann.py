@@ -122,11 +122,15 @@ class ClasificadorANN(ClasificadorFacialBase):
         X_train: np.ndarray,
         y_train: np.ndarray,
         X_val: np.ndarray,
-        y_val: np.ndarray
+        y_val: np.ndarray,
+        pesos_clases: Optional[Any] = None,
+        metrica_checkpoint: str = "acc",
+        pesos_muestras: Optional[np.ndarray] = None,
     ) -> None:
         """
         Entrena la red durante el número de épocas especificado, evaluando
-        al final de cada época en validación y guardando los mejores pesos.
+        al final de cada época en validación y guardando los mejores pesos
+        según la métrica de checkpoint ('acc' o 'macro_recall').
         """
         import copy
         import torch
@@ -141,17 +145,30 @@ class ClasificadorANN(ClasificadorFacialBase):
         X_val_t = torch.tensor(X_val, dtype=torch.float32)
         y_val_t = torch.tensor(y_val, dtype=torch.long)
 
-        dataset_tr = TensorDataset(X_tr_t, y_tr_t)
+        if pesos_muestras is not None:
+            w_muestras_t = torch.tensor(np.asarray(pesos_muestras, dtype=np.float32), dtype=torch.float32)
+            dataset_tr = TensorDataset(X_tr_t, y_tr_t, w_muestras_t)
+            criterio_tr = nn.CrossEntropyLoss(reduction="none")
+            criterio_val = nn.CrossEntropyLoss()
+        else:
+            dataset_tr = TensorDataset(X_tr_t, y_tr_t)
+            if pesos_clases is not None:
+                w_tensor = torch.as_tensor(pesos_clases, dtype=torch.float32)
+                criterio_tr = nn.CrossEntropyLoss(weight=w_tensor)
+                criterio_val = criterio_tr
+            else:
+                criterio_tr = nn.CrossEntropyLoss()
+                criterio_val = criterio_tr
+
         loader_tr = DataLoader(dataset_tr, batch_size=self.tamano_lote, shuffle=True)
 
-        criterio = nn.CrossEntropyLoss()
         optimizador = optim.Adam(
             self.modelo.parameters(),
             lr=self.lr,
             weight_decay=self.weight_decay
         )
 
-        mejor_acc = -1.0
+        mejor_score = -1.0
         mejor_pesos = None
         self.historia_entrenamiento = {
             "loss_train": [],
@@ -166,10 +183,17 @@ class ClasificadorANN(ClasificadorFacialBase):
             correctos_tr = 0
             total_tr = 0
 
-            for bx, by in loader_tr:
-                optimizador.zero_grad()
-                salida = self.modelo(bx)
-                loss = criterio(salida, by)
+            for lote in loader_tr:
+                if pesos_muestras is not None:
+                    bx, by, bw = lote
+                    optimizador.zero_grad()
+                    salida = self.modelo(bx)
+                    loss = (criterio_tr(salida, by) * bw).mean()
+                else:
+                    bx, by = lote
+                    optimizador.zero_grad()
+                    salida = self.modelo(bx)
+                    loss = criterio_tr(salida, by)
                 loss.backward()
                 optimizador.step()
 
@@ -185,7 +209,7 @@ class ClasificadorANN(ClasificadorFacialBase):
             self.modelo.eval()
             with torch.no_grad():
                 out_val = self.modelo(X_val_t)
-                loss_val_ep = criterio(out_val, y_val_t).item()
+                loss_val_ep = criterio_val(out_val, y_val_t).item()
                 preds_val = torch.argmax(out_val, dim=1)
                 acc_val_ep = ((preds_val == y_val_t).sum().item() / len(y_val_t)) * 100.0
 
@@ -194,15 +218,27 @@ class ClasificadorANN(ClasificadorFacialBase):
             self.historia_entrenamiento["acc_train"].append(round(acc_tr_ep, 2))
             self.historia_entrenamiento["acc_val"].append(round(acc_val_ep, 2))
 
-            if acc_val_ep > mejor_acc:
-                mejor_acc = acc_val_ep
+            if metrica_checkpoint == "macro_recall":
+                recalls = []
+                for c in range(self.n_clases):
+                    mask_c = (y_val_t == c)
+                    total_c = mask_c.sum().item()
+                    if total_c > 0:
+                        rec_c = ((preds_val[mask_c] == c).sum().item() / total_c) * 100.0
+                        recalls.append(rec_c)
+                score_val_ep = float(np.mean(recalls)) if recalls else acc_val_ep
+            else:
+                score_val_ep = acc_val_ep
+
+            if score_val_ep > mejor_score:
+                mejor_score = score_val_ep
                 self.mejor_epoca_ = ep
                 mejor_pesos = copy.deepcopy(self.modelo.state_dict())
 
         # Restaurar mejor modelo
         if mejor_pesos is not None:
             self.modelo.load_state_dict(mejor_pesos)
-        self.mejor_val_acc_ = mejor_acc
+        self.mejor_val_acc_ = mejor_score
         self.modelo.eval()
 
     def predecir(self, X: np.ndarray) -> np.ndarray:

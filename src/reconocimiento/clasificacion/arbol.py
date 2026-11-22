@@ -33,17 +33,20 @@ class ClasificadorArbol(ClasificadorFacialBase):
         criterio: str = "entropy",
         max_depth: Optional[int] = None,
         min_samples_leaf: int = 1,
+        class_weight: Optional[Any] = None,
         semilla: int = 42
     ):
         self.criterio = criterio
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
+        self.class_weight = class_weight
         self.semilla = semilla
 
         self.modelo = DecisionTreeClassifier(
             criterion=self.criterio,
             max_depth=self.max_depth,
             min_samples_leaf=self.min_samples_leaf,
+            class_weight=self.class_weight,
             random_state=self.semilla
         )
         self.clases_: Optional[np.ndarray] = None
@@ -51,11 +54,17 @@ class ClasificadorArbol(ClasificadorFacialBase):
         self.n_hojas_: Optional[int] = None
         self.importancias_caracteristicas_: Optional[np.ndarray] = None
 
-    def entrenar(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
+    def entrenar(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        sample_weight: Optional[np.ndarray] = None,
+    ) -> None:
         """Ajusta el árbol de decisión sobre el conjunto de entrenamiento."""
         X_arr = np.asarray(X_train, dtype=np.float32)
         y_arr = np.asarray(y_train, dtype=np.int32)
-        self.modelo.fit(X_arr, y_arr)
+        sw = np.asarray(sample_weight, dtype=np.float32) if sample_weight is not None else None
+        self.modelo.fit(X_arr, y_arr, sample_weight=sw)
         self.clases_ = self.modelo.classes_
         self.profundidad_efectiva_ = int(self.modelo.get_depth())
         self.n_hojas_ = int(self.modelo.get_n_leaves())
@@ -111,6 +120,9 @@ class ClasificadorArbol(ClasificadorFacialBase):
         y_val: np.ndarray,
         rejilla_max_depth: List[Optional[int]] = [5, 10, 15, 20, None],
         rejilla_min_samples_leaf: List[int] = [1, 2, 4],
+        class_weight: Optional[Any] = None,
+        sample_weight: Optional[np.ndarray] = None,
+        metrica: str = "acc",
         semilla: int = 42
     ) -> Tuple["ClasificadorArbol", List[Dict[str, Any]], Dict[str, Any]]:
         """
@@ -118,7 +130,7 @@ class ClasificadorArbol(ClasificadorFacialBase):
         y entrena el modelo con la mejor configuración encontrada.
         """
         historial_validaciones: List[Dict[str, Any]] = []
-        mejor_exactitud_val = -1.0
+        mejor_score_val = -1.0
         mejor_cfg = {"max_depth": None, "min_samples_leaf": 1}
 
         for md in rejilla_max_depth:
@@ -127,14 +139,25 @@ class ClasificadorArbol(ClasificadorFacialBase):
                     criterio="entropy",
                     max_depth=md,
                     min_samples_leaf=msl,
+                    class_weight=class_weight,
                     semilla=semilla
                 )
                 t0 = time.perf_counter()
-                arbol_candidato.entrenar(X_train, y_train)
+                arbol_candidato.entrenar(X_train, y_train, sample_weight=sample_weight)
                 tiempo_fit = time.perf_counter() - t0
 
                 y_val_pred = arbol_candidato.predecir(X_val)
                 acc_val = float(np.mean(y_val_pred == y_val) * 100.0)
+
+                if metrica == "macro_recall":
+                    recalls = []
+                    for c in np.unique(y_val):
+                        mask = (y_val == c)
+                        if np.sum(mask) > 0:
+                            recalls.append(float(np.mean(y_val_pred[mask] == c)) * 100.0)
+                    score_val = float(np.mean(recalls)) if recalls else acc_val
+                else:
+                    score_val = acc_val
 
                 registro = {
                     "max_depth": md,
@@ -143,13 +166,14 @@ class ClasificadorArbol(ClasificadorFacialBase):
                     "profundidad_efectiva": arbol_candidato.profundidad_efectiva_,
                     "n_hojas": arbol_candidato.n_hojas_,
                     "exactitud_validacion": round(acc_val, 2),
+                    "score_validacion": round(score_val, 2),
                     "tiempo_entrenamiento_s": round(tiempo_fit, 4)
                 }
                 historial_validaciones.append(registro)
 
-                # Criterio de selección: mayor exactitud en validación; en empate, menor profundidad
-                if acc_val > mejor_exactitud_val:
-                    mejor_exactitud_val = acc_val
+                # Criterio de selección: mayor score en validación; en empate, menor profundidad
+                if score_val > mejor_score_val:
+                    mejor_score_val = score_val
                     mejor_cfg = {"max_depth": md, "min_samples_leaf": msl}
 
         # Entrenar modelo final seleccionado
@@ -157,9 +181,10 @@ class ClasificadorArbol(ClasificadorFacialBase):
             criterio="entropy",
             max_depth=mejor_cfg["max_depth"],
             min_samples_leaf=mejor_cfg["min_samples_leaf"],
+            class_weight=class_weight,
             semilla=semilla
         )
-        modelo_elegido.entrenar(X_train, y_train)
+        modelo_elegido.entrenar(X_train, y_train, sample_weight=sample_weight)
 
         return modelo_elegido, historial_validaciones, mejor_cfg
 

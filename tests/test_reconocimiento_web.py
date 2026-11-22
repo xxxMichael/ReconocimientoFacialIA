@@ -30,10 +30,19 @@ class MockModeloReconocimiento:
 class TestReconocimientoPuertaWeb(unittest.TestCase):
 
     def setUp(self):
-        self.app = crear_app()
+        self.app = crear_app(indice_inicial=-1)
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
         self.gestor = self.app.config["GESTOR_CAMARA"]
+        self.gestor.detener()
+        self.gestor.detener_evento.clear()
+        with self.gestor.lock_buffer:
+            self.gestor.buffer.clear()
+            self.gestor.contador_frames = 0
+
+    def tearDown(self):
+        if self.gestor.capturador is not None or (self.gestor.hilo_trabajador and self.gestor.hilo_trabajador.is_alive()):
+            self.gestor.detener()
 
     def test_reconocimiento_abrir_puerta_con_autorizado(self):
         """Verifica que un rostro autorizado con confianza >= umbral abra la puerta."""

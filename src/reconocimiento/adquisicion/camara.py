@@ -18,8 +18,11 @@ from reconocimiento.adquisicion.propio import (
     RegistroCaptura,
     POSES_VALIDAS,
     PARTICIONES_VALIDAS,
-    calcular_hash_archivo
+    calcular_hash_archivo,
+    validar_coherencia_sesion_particion_propio,
+    es_manifiesto_propio
 )
+from reconocimiento.preprocesamiento.fabrica import crear_detector
 from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion
 
 _LOCK_GUARDADO = threading.Lock()
@@ -226,6 +229,9 @@ def guardar_fotograma_atomico(
             es_val_dup, err_dup = manifiesto.validar_duplicados_entre_particiones()
             if not es_val_dup:
                 raise ValueError(f"Violación de duplicados entre particiones: {err_dup}")
+            es_val_desc, err_desc = manifiesto.validar_aislamiento_desconocidos()
+            if not es_val_desc:
+                raise ValueError(f"Violación de aislamiento de desconocidos: {err_desc}")
             manifiesto.guardar()
         except Exception as e:
             # Reversión atómica: borrar imagen en disco si el manifiesto falla
@@ -248,7 +254,7 @@ def ejecutar_vista_previa(
     sobre una copia para pantalla. Permite salir limpiamente con Esc.
     """
     if detector is None:
-        detector = DetectorFacial()
+        detector = crear_detector()
 
     capturador = capturador_custom or CapturadorCamara(indice=indice)
     titulo_ventana = f"Vista Previa - Reconocimiento Facial (Indice {indice} | ESC: Salir)"
@@ -371,8 +377,13 @@ def ejecutar_modo_captura(
     if particion not in PARTICIONES_VALIDAS:
         raise ValueError(f"Partición '{particion}' no válida. Opciones: {sorted(PARTICIONES_VALIDAS)}")
 
+    if not es_ensayo and es_manifiesto_propio(ruta_manifiesto):
+        es_val_proto, err_proto = validar_coherencia_sesion_particion_propio(sesion, particion)
+        if not es_val_proto:
+            raise ValueError(err_proto)
+
     if detector is None:
-        detector = DetectorFacial()
+        detector = crear_detector()
 
     capturador = capturador_custom or CapturadorCamara(indice=indice)
     manifiesto = ManifiestoDataset(ruta_manifiesto)

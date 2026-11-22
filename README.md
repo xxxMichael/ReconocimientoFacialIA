@@ -13,18 +13,42 @@ python -m venv .venv
 
 Si ya tienes el entorno, repite solo el segundo comando después de actualizar el repositorio. Para cargar un modelo neuronal local, instala el extra opcional con `.\.venv\Scripts\python.exe -m pip install -e ".[redes]"`.
 
-## Abrir la interfaz web
+## Abrir la interfaz web (Modelo recomendado: CNN Estándar Portal Completo 0.61)
 
-Conecta la cámara. Si usas DroidCam, inicia primero la conexión con el celular. Desde la carpeta del proyecto ejecuta:
+Conecta la cámara. Si usas DroidCam, inicia primero la conexión con el celular. Desde la carpeta del proyecto ejecuta (el sistema carga por defecto **`CNN Estándar Portal Completo — 0.61`**, el mejor modelo calibrado en validación y pruebas en vivo):
 
 ```powershell
-.\.venv\Scripts\python.exe -m reconocimiento web --indice 1
+python -m reconocimiento web --indice 1
 ```
 
-Abre [la interfaz local](http://127.0.0.1:5000) en tu navegador. Si aparece otra cámara, pulsa **Sondear**, elige el dispositivo y pulsa **Iniciar cámara**. Para cerrar el servidor, usa **Ctrl+C** en PowerShell.
+Para especificar explícitamente el archivo de configuración del mejor modelo (`configuracion_candidato_estandar_portal_061.json`):
+
+```powershell
+python -m reconocimiento web --indice 1 --config-candidato configuracion_candidato_estandar_portal_061.json
+```
+
+*(Si utilizas el entorno virtual `.venv`, reemplaza `python` por `.\.venv\Scripts\python.exe`.)*
+
+Abre [la interfaz local](http://127.0.0.1:5000) en tu navegador. Si aparece otra cámara, pulsa **Sondear**, elige el dispositivo y pulsa **Iniciar cámara**. Desde el selector **Modelo Activo** también puedes comparar en vivo contra `CNN Antialiasing — 0.52`. Para cerrar el servidor, usa **Ctrl+C** en PowerShell.
+
+## Portal independiente de reconocimiento remoto (celular / laptop)
+
+Para que otros participantes prueben el reconocimiento desde sus propios navegadores (`getUserMedia`) sin exponer el panel administrativo ni las fotos del proyecto:
+
+```powershell
+python scripts\iniciar_portal_reconocimiento.py --puerto 5002
+```
+
+(Equivalente por CLI: `python -m reconocimiento portal-reconocimiento --port 5002`). Este portal usa por defecto **`CNN Estándar Portal Completo — 0.61`** y permite comparar **`CNN Estándar 0.61 + Filtro Calidad (Fase 1)`**, **`CNN Fase 2 Robustez — 0.62`** y **`CNN Antialiasing — 0.52`**. Para exponerlo por HTTPS mediante Cloudflare Tunnel:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:5002
+```
+
+Consulta [GUIA_PORTAL_RECONOCIMIENTO.md](GUIA_PORTAL_RECONOCIMIENTO.md) para el detalle del piloto remoto.
 
 ## Registrar una sesión
 
 Selecciona **Sesión Real**, tu identificador asignado, la sesión y la pose. Comprueba la partición antes de guardar: sesiones 01–03 para entrenamiento, 04 para validación y 05 para prueba. Confirma que el recuadro cubre el rostro y usa **Revisar Capturas** para corregirlo si hace falta.
 
-Git admite las fotos de las sesiones reales en `data/propio/imagenes/` y sus registros en `data/propio/manifiesto.csv`. Quienes tengan acceso al repositorio podrán ver las fotos que compartas. Los ensayos en `data/ensayos/` quedan fuera de Git. Si dos participantes modifican el manifiesto, conserva las filas de ambos al combinar sus cambios.
+Git admite las fotos de las sesiones reales en `data/propio/imagenes/` y sus registros en `data/propio/manifiesto.csv`. Las fotografías externas recibidas en `data/recepcion_externa/` y los ensayos en `data/ensayos/` quedan fuera de Git. Si dos participantes modifican el manifiesto, conserva las filas de ambos al combinar sus cambios.

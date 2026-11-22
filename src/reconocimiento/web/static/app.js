@@ -16,8 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Elementos DOM - Pestañas de Navegación Principal
   const tabNavCamara = document.getElementById("tab-nav-camara");
   const tabNavRevision = document.getElementById("tab-nav-revision");
+  const tabNavPipeline = document.getElementById("tab-nav-pipeline");
   const mainLayout = document.getElementById("main-layout");
   const revisionLayout = document.getElementById("revision-layout");
+  const pipelineLayout = document.getElementById("pipeline-layout");
   const modeSwitchGroup = document.getElementById("mode-switch-group");
 
   // Elementos DOM - Alternancia de Vista en Cámara (Entrenamiento vs Producción)
@@ -37,9 +39,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelReal = document.getElementById("label-real");
   const modeTag = document.getElementById("mode-tag");
   const selectPersona = document.getElementById("select-persona");
+  const grpPersonaAutorizada = document.getElementById("grp-persona-autorizada");
+  const grpPersonaExterna = document.getElementById("grp-persona-externa");
+  const inputPersonaExterna = document.getElementById("input-persona-externa");
+  const grpGrupoContainer = document.getElementById("grp-grupo-container");
+  const selectGrupo = document.getElementById("select-grupo");
+  const grpDistanciaContainer = document.getElementById("grp-distancia-container");
+  const selectDistancia = document.getElementById("select-distancia");
   const selectTipoSujeto = document.getElementById("select-tipo-sujeto");
   const selectSesion = document.getElementById("select-sesion");
   const selectParticion = document.getElementById("select-particion");
+  const particionAyuda = document.getElementById("particion-ayuda");
   const chkConsentimiento = document.getElementById("chk-consentimiento");
   const poseButtonsContainer = document.getElementById("pose-buttons-container");
 
@@ -79,12 +89,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const imgCongeladaRecorte = document.getElementById("img-congelada-recorte");
   const lblCongeladoFrame = document.getElementById("lbl-congelado-frame");
   const lblCongeladoEstado = document.getElementById("lbl-congelado-estado");
+  const lblCongeladoTipoSujeto = document.getElementById("lbl-congelado-tipo-sujeto");
+  const boxCongeladoGrupo = document.getElementById("box-congelado-grupo");
+  const lblCongeladoGrupo = document.getElementById("lbl-congelado-grupo");
+  const lblCongeladoDistancia = document.getElementById("lbl-congelado-distancia");
   const lblCongeladoPose = document.getElementById("lbl-congelado-pose");
   const lblCongeladoPersona = document.getElementById("lbl-congelado-persona");
+  const lblCongeladoSesion = document.getElementById("lbl-congelado-sesion");
+  const lblCongeladoParticion = document.getElementById("lbl-congelado-particion");
+  const lblCongeladoConsentimiento = document.getElementById("lbl-congelado-consentimiento");
   const lblCongeladoAvisoDibujo = document.getElementById("lbl-congelado-aviso-dibujo");
 
   // Elementos DOM - Pestaña Revisar Capturas (Requisitos 1 y 2)
+  const revFilterTipoSujeto = document.getElementById("rev-filter-tipo-sujeto");
   const revFilterPersona = document.getElementById("rev-filter-persona");
+  const revFilterGrupo = document.getElementById("rev-filter-grupo");
+  const revFilterDistancia = document.getElementById("rev-filter-distancia");
   const revFilterSesion = document.getElementById("rev-filter-sesion");
   const revFilterPose = document.getElementById("rev-filter-pose");
   const revFilterParticion = document.getElementById("rev-filter-particion");
@@ -148,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================================================================
   sondearCamaras();
   actualizarModoVisual();
+  cargarMapeoProtocolo();
   cargarProgresoSesion();
   iniciarBucleVideo();
   configurarAlternanciaVistas();
@@ -162,22 +183,36 @@ document.addEventListener("DOMContentLoaded", () => {
   function configurarPestanasNavegacion() {
     if (!tabNavCamara || !tabNavRevision) return;
 
-    tabNavCamara.addEventListener("click", () => {
-      tabNavCamara.classList.add("active");
-      tabNavRevision.classList.remove("active");
-      mainLayout.classList.remove("hidden");
-      if (modeSwitchGroup) modeSwitchGroup.style.display = "flex";
-      revisionLayout.classList.add("hidden");
-    });
+    function activarPestana(nombre) {
+      [tabNavCamara, tabNavRevision, tabNavPipeline].forEach(t => { if (t) t.classList.remove("active"); });
+      if (mainLayout) mainLayout.classList.add("hidden");
+      if (revisionLayout) revisionLayout.classList.add("hidden");
+      if (pipelineLayout) pipelineLayout.classList.add("hidden");
 
-    tabNavRevision.addEventListener("click", () => {
-      tabNavRevision.classList.add("active");
-      tabNavCamara.classList.remove("active");
-      mainLayout.classList.add("hidden");
-      if (modeSwitchGroup) modeSwitchGroup.style.display = "none";
-      revisionLayout.classList.remove("hidden");
-      cargarListaRevision();
-    });
+      if (nombre === "camara") {
+        tabNavCamara.classList.add("active");
+        if (mainLayout) mainLayout.classList.remove("hidden");
+        if (modeSwitchGroup) modeSwitchGroup.style.display = "flex";
+        detenerAutoPipeline();
+      } else if (nombre === "revision") {
+        tabNavRevision.classList.add("active");
+        if (revisionLayout) revisionLayout.classList.remove("hidden");
+        if (modeSwitchGroup) modeSwitchGroup.style.display = "none";
+        detenerAutoPipeline();
+        cargarListaRevision();
+      } else if (nombre === "pipeline") {
+        if (tabNavPipeline) tabNavPipeline.classList.add("active");
+        if (pipelineLayout) pipelineLayout.classList.remove("hidden");
+        if (modeSwitchGroup) modeSwitchGroup.style.display = "none";
+        cargarMuestrasDatasetPipeline();
+      }
+    }
+
+    tabNavCamara.addEventListener("click", () => activarPestana("camara"));
+    tabNavRevision.addEventListener("click", () => activarPestana("revision"));
+    if (tabNavPipeline) {
+      tabNavPipeline.addEventListener("click", () => activarPestana("pipeline"));
+    }
   }
 
   // =========================================================================
@@ -247,14 +282,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function abrirModalCongelado(fid) {
     if (inFlightCapture) return;
+    if (!chkConsentimiento || !chkConsentimiento.checked) {
+      mostrarAlerta("Debe marcar la casilla de consentimiento informado explícito antes de capturar.", "warning");
+      return;
+    }
     inFlightCapture = true;
+
+    const tipoSujeto = selectTipoSujeto.value;
+    const persona = (tipoSujeto === "desconocido")
+      ? (inputPersonaExterna?.value || "externo_001").trim().toLowerCase()
+      : selectPersona.value;
+    const grupo = (tipoSujeto === "desconocido") ? selectGrupo?.value : "";
+    const distancia = selectDistancia ? selectDistancia.value : "media";
+    const sesion = selectSesion.value;
+    const particion = selectParticion.value;
+    const pose = currentPose;
+    const consentimiento = chkConsentimiento.checked;
+    const esEnsayo = radioEnsayo.checked;
+
+    const metadatos = {
+      sesion,
+      particion,
+      persona,
+      tipo_sujeto: tipoSujeto,
+      grupo,
+      distancia,
+      pose,
+      consentimiento,
+      es_ensayo: esEnsayo
+    };
     mostrarAlerta(`Congelando fotograma #${fid} para inspección...`, "info");
 
     try {
       const resp = await fetch("/api/captura/congelar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_fotograma: fid })
+        body: JSON.stringify({ id_fotograma: fid, ...metadatos })
       });
 
       if (!resp.ok) {
@@ -264,10 +327,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       frozenData = await resp.json();
+      Object.assign(frozenData, metadatos);
+
       lblCongeladoFrame.textContent = "#" + frozenData.id_fotograma;
       lblCongeladoEstado.textContent = frozenData.estado;
-      lblCongeladoPose.textContent = currentPose;
-      lblCongeladoPersona.textContent = selectPersona.value;
+      lblCongeladoPose.textContent = frozenData.pose;
+      lblCongeladoPersona.textContent = frozenData.persona;
+      if (lblCongeladoTipoSujeto) lblCongeladoTipoSujeto.textContent = frozenData.tipo_sujeto;
+      if (boxCongeladoGrupo) {
+        boxCongeladoGrupo.style.display = (frozenData.tipo_sujeto === "desconocido") ? "block" : "none";
+        if (lblCongeladoGrupo) lblCongeladoGrupo.textContent = frozenData.grupo || "-";
+      }
+      if (lblCongeladoDistancia) lblCongeladoDistancia.textContent = frozenData.distancia || "-";
+      if (lblCongeladoSesion) lblCongeladoSesion.textContent = frozenData.sesion;
+      if (lblCongeladoParticion) lblCongeladoParticion.textContent = frozenData.particion;
+      if (lblCongeladoConsentimiento) lblCongeladoConsentimiento.textContent = frozenData.consentimiento ? "Sí (Verificado)" : "No";
 
       frozenCurrentBox = frozenData.recuadro ? [...frozenData.recuadro] : null;
       frozenDrawingMode = false;
@@ -323,6 +397,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const fid = frozenData.id_fotograma;
         const box = frozenCurrentBox;
         const fueCorregida = (frozenDrawingMode && box !== null);
+        const metadatosCongelados = {
+          persona: frozenData.persona,
+          tipo_sujeto: frozenData.tipo_sujeto,
+          grupo: frozenData.grupo,
+          distancia: frozenData.distancia,
+          sesion: frozenData.sesion,
+          pose: frozenData.pose,
+          particion: frozenData.particion,
+          consentimiento: frozenData.consentimiento,
+          es_ensayo: frozenData.es_ensayo
+        };
 
         cerrarModalCongelado();
 
@@ -330,7 +415,8 @@ document.addEventListener("DOMContentLoaded", () => {
           id_fotograma: fid,
           caja: box,
           decision: fueCorregida ? "corregida" : "aprobada",
-          origen_caja: fueCorregida ? "manual" : "vivo"
+          origen_caja: fueCorregida ? "manual" : "vivo",
+          ...metadatosCongelados
         });
       });
     }
@@ -370,6 +456,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (modalCongelar) modalCongelar.classList.add("hidden");
     frozenData = null;
     frozenRawImg = null;
+    if (lblCongeladoSesion) lblCongeladoSesion.textContent = "-";
+    if (lblCongeladoParticion) lblCongeladoParticion.textContent = "-";
     if (imgCongeladaRecorte) {
       imgCongeladaRecorte.src = "";
       imgCongeladaRecorte.style.display = "none";
@@ -408,14 +496,25 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarEstadoBotones();
 
     const fid = opcionesExtra.id_fotograma || currentFrameId;
-    const esEnsayo = radioEnsayo.checked;
-    const persona = selectPersona.value;
-    const tipoSujeto = selectTipoSujeto.value;
-    const sesion = selectSesion.value;
-    const pose = currentPose;
-    const particion = selectParticion.value;
-    const consentimiento = true;
+    const esEnsayo = opcionesExtra.es_ensayo ?? radioEnsayo.checked;
+    const tipoSujeto = opcionesExtra.tipo_sujeto ?? selectTipoSujeto.value;
+    const persona = opcionesExtra.persona ?? (
+      tipoSujeto === "desconocido" ? (inputPersonaExterna?.value || "externo_001").trim().toLowerCase() : selectPersona.value
+    );
+    const grupo = opcionesExtra.grupo ?? (tipoSujeto === "desconocido" ? selectGrupo?.value : null);
+    const distancia = opcionesExtra.distancia ?? (selectDistancia ? selectDistancia.value : "media");
+    const sesion = opcionesExtra.sesion || selectSesion.value;
+    const pose = opcionesExtra.pose ?? currentPose;
+    const particion = opcionesExtra.particion || selectParticion.value;
+    const consentimiento = opcionesExtra.consentimiento ?? (chkConsentimiento ? chkConsentimiento.checked : false);
     const idempotencyKey = `cap_${persona}_${sesion}_${pose}_${fid}_${Date.now()}`;
+
+    if (!consentimiento) {
+      mostrarAlerta("Se requiere consentimiento informado explícito para registrar la captura.", "danger");
+      inFlightCapture = false;
+      actualizarEstadoBotones();
+      return;
+    }
 
     mostrarAlerta(`Guardando captura #${fid} de forma coherente...`, "info");
 
@@ -425,6 +524,8 @@ document.addEventListener("DOMContentLoaded", () => {
         modo: modo,
         persona: persona,
         tipo_sujeto: tipoSujeto,
+        grupo: grupo,
+        distancia: distancia,
         sesion: sesion,
         pose: pose,
         particion: particion,
@@ -474,9 +575,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnRevRecargar) {
       btnRevRecargar.addEventListener("click", cargarListaRevision);
     }
-    if (revFilterEntorno) {
-      revFilterEntorno.addEventListener("change", cargarListaRevision);
-    }
+    [revFilterEntorno, revFilterTipoSujeto, revFilterPersona, revFilterGrupo, revFilterDistancia, revFilterSesion, revFilterPose, revFilterParticion, revFilterDecision].forEach(el => {
+      if (el) el.addEventListener("change", cargarListaRevision);
+    });
 
     if (btnRevAnterior) {
       btnRevAnterior.addEventListener("click", () => {
@@ -563,12 +664,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const pose = revFilterPose?.value || "todas";
     const particion = revFilterParticion?.value || "todas";
     const decision = revFilterDecision?.value || "todas";
-    const esEnsayo = (revFilterEntorno?.value === "ensayo");
+    const tipoSujeto = revFilterTipoSujeto?.value || "todas";
+    const grupo = revFilterGrupo?.value || "todas";
+    const distancia = revFilterDistancia?.value || "todas";
+    const entorno = revFilterEntorno?.value || "real";
+    const esEnsayo = (entorno === "ensayo");
 
     revItemsContainer.innerHTML = `<div style="padding: 16px; color: var(--text-muted);">Cargando capturas...</div>`;
 
     try {
-      const url = `/api/revision/capturas?es_ensayo=${esEnsayo}&persona=${persona}&sesion=${sesion}&pose=${pose}&particion=${particion}&decision=${decision}`;
+      const url = `/api/revision/capturas?entorno=${entorno}&es_ensayo=${esEnsayo}&persona=${persona}&sesion=${sesion}&pose=${pose}&particion=${particion}&decision=${decision}&tipo_sujeto=${tipoSujeto}&grupo=${grupo}&distancia=${distancia}`;
       const resp = await fetch(url);
       const data = await resp.json();
 
@@ -593,12 +698,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const badgeClass = `badge-decision-${item.decision_humana || "pendiente"}`;
         const decLabel = (item.decision_humana || "pendiente").toUpperCase();
 
+        const rolLabel = item.tipo_sujeto === "desconocido" ? (item.grupo || "desconocido") : item.tipo_sujeto;
         card.innerHTML = `
           <div class="revision-item-top">
             <span>${item.identificador}</span>
             <span class="${badgeClass}">${decLabel}</span>
           </div>
           <div class="revision-item-sub">
+            <span>${rolLabel}</span> •
+            <span>${item.distancia || "media"}</span> •
             <span>${item.pose}</span> •
             <span>${item.sesion}</span> •
             <span>${item.particion}</span>
@@ -633,9 +741,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function cargarDetalleRevision(identificador) {
-    const esEnsayo = (revFilterEntorno?.value === "ensayo");
+    const entorno = revFilterEntorno?.value || "real";
+    const esEnsayo = (entorno === "ensayo");
     try {
-      const resp = await fetch(`/api/revision/detalle/${identificador}?es_ensayo=${esEnsayo}`);
+      const resp = await fetch(`/api/revision/detalle/${identificador}?entorno=${entorno}&es_ensayo=${esEnsayo}`);
       if (!resp.ok) return;
 
       currentRevisionData = await resp.json();
@@ -728,7 +837,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function aplicarDecisionRevision(decision) {
     if (!currentRevisionData) return;
     const identificador = currentRevisionData.identificador;
-    const esEnsayo = (revFilterEntorno?.value === "ensayo");
+    const entorno = revFilterEntorno?.value || "real";
+    const esEnsayo = (entorno === "ensayo");
     const box = inspectorCurrentBox;
 
     try {
@@ -739,6 +849,7 @@ document.addEventListener("DOMContentLoaded", () => {
           identificador: identificador,
           decision: decision,
           caja: box,
+          entorno: entorno,
           es_ensayo: esEnsayo
         })
       });
@@ -1064,10 +1175,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Entorno (Ensayo vs Real)
   radioEnsayo?.addEventListener("change", () => {
     actualizarModoVisual();
+    sincronizarParticion();
     cargarProgresoSesion();
   });
   radioReal?.addEventListener("change", () => {
     actualizarModoVisual();
+    sincronizarParticion();
     cargarProgresoSesion();
   });
 
@@ -1086,8 +1199,121 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function actualizarVisibilidadTipoSujeto() {
+    const esDesconocido = selectTipoSujeto && selectTipoSujeto.value === "desconocido";
+    if (grpPersonaAutorizada) grpPersonaAutorizada.style.display = esDesconocido ? "none" : "block";
+    if (grpPersonaExterna) grpPersonaExterna.style.display = esDesconocido ? "block" : "none";
+    if (grpGrupoContainer) grpGrupoContainer.style.display = esDesconocido ? "block" : "none";
+    sincronizarParticion();
+  }
+
+  selectTipoSujeto?.addEventListener("change", () => {
+    actualizarVisibilidadTipoSujeto();
+    cargarProgresoSesion();
+  });
+  selectGrupo?.addEventListener("change", () => {
+    sincronizarParticion();
+    cargarProgresoSesion();
+  });
+  inputPersonaExterna?.addEventListener("input", cargarProgresoSesion);
   selectPersona?.addEventListener("change", cargarProgresoSesion);
-  selectSesion?.addEventListener("change", cargarProgresoSesion);
+  selectSesion?.addEventListener("change", () => {
+    sincronizarParticion();
+    cargarProgresoSesion();
+  });
+
+  selectParticion?.addEventListener("change", () => {
+    const esEnsayo = radioEnsayo ? radioEnsayo.checked : false;
+    const tipoSujeto = selectTipoSujeto ? selectTipoSujeto.value : "autorizado";
+    if (!esEnsayo) {
+      if (tipoSujeto === "desconocido") {
+        const g = selectGrupo ? selectGrupo.value : "desconocidos_calibracion";
+        const esperada = (g === "desconocidos_ajuste") ? "entrenamiento" : ((g === "desconocidos_prueba") ? "prueba" : "validacion");
+        if (selectParticion.value !== esperada) {
+          mostrarAlerta(`Protocolo estricto: El grupo '${g}' sólo admite la partición '${esperada}'.`, "warning");
+          selectParticion.value = esperada;
+        }
+      } else {
+        const sesion = selectSesion.value;
+        const esperada = mapeoProtocoloParticiones[sesion];
+        if (esperada && selectParticion.value !== esperada) {
+          mostrarAlerta(`Protocolo estricto: La sesión '${sesion}' sólo admite la partición '${esperada}'.`, "warning");
+          selectParticion.value = esperada;
+        }
+      }
+    }
+  });
+
+  let mapeoProtocoloParticiones = {
+    sesion_01: "entrenamiento",
+    sesion_02: "entrenamiento",
+    sesion_03: "entrenamiento",
+    sesion_04: "validacion",
+    sesion_05: "prueba"
+  };
+
+  async function cargarMapeoProtocolo() {
+    try {
+      const resp = await fetch("/api/protocolo/particiones");
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.mapeo_sesion_particion) {
+          mapeoProtocoloParticiones = data.mapeo_sesion_particion;
+        }
+      }
+    } catch (e) {
+      // Usar mapeo predeterminado
+    }
+    actualizarVisibilidadTipoSujeto();
+    sincronizarParticion();
+  }
+
+  function sincronizarParticion() {
+    if (!selectParticion) return;
+    const esEnsayo = radioEnsayo ? radioEnsayo.checked : false;
+    const tipoSujeto = selectTipoSujeto ? selectTipoSujeto.value : "autorizado";
+
+    if (tipoSujeto === "desconocido") {
+      const g = selectGrupo ? selectGrupo.value : "desconocidos_calibracion";
+      let esperada = "validacion";
+      if (g === "desconocidos_ajuste") esperada = "entrenamiento";
+      else if (g === "desconocidos_prueba") esperada = "prueba";
+
+      selectParticion.value = esperada;
+      Array.from(selectParticion.options).forEach(opt => {
+        opt.disabled = (!esEnsayo && opt.value !== esperada);
+      });
+      if (particionAyuda) {
+        particionAyuda.textContent = `🔒 Asignada por grupo (${g} → ${esperada})`;
+        particionAyuda.style.color = "var(--color-primary, #58a6ff)";
+      }
+      return;
+    }
+
+    if (!esEnsayo) {
+      const sesion = selectSesion ? selectSesion.value : "sesion_01";
+      const esperada = mapeoProtocoloParticiones[sesion];
+      if (esperada) {
+        selectParticion.value = esperada;
+        Array.from(selectParticion.options).forEach(opt => {
+          opt.disabled = (opt.value !== esperada);
+        });
+        if (particionAyuda) {
+          particionAyuda.textContent = `🔒 Asignada por protocolo (${sesion} → ${esperada})`;
+          particionAyuda.style.color = "var(--color-primary, #58a6ff)";
+        }
+      } else {
+        Array.from(selectParticion.options).forEach(opt => opt.disabled = false);
+        if (particionAyuda) particionAyuda.textContent = "";
+      }
+    } else {
+      Array.from(selectParticion.options).forEach(opt => opt.disabled = false);
+      if (particionAyuda) {
+        particionAyuda.textContent = "⚙️ Modo Ensayo (partición libre)";
+        particionAyuda.style.color = "var(--text-muted, #8b949e)";
+      }
+    }
+  }
 
   if (poseButtonsContainer) {
     poseButtonsContainer.addEventListener("click", (e) => {
@@ -1101,7 +1327,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function cargarProgresoSesion() {
     const esEnsayo = radioEnsayo.checked;
-    const persona = selectPersona.value;
+    const tipoSujeto = selectTipoSujeto ? selectTipoSujeto.value : "autorizado";
+    const persona = (tipoSujeto === "desconocido")
+      ? (inputPersonaExterna?.value || "externo_001").trim().toLowerCase()
+      : selectPersona.value;
     const sesion = selectSesion.value;
 
     lblPersonaActual.textContent = persona;
@@ -1153,4 +1382,282 @@ document.addEventListener("DOMContentLoaded", () => {
     alertMsg.textContent = msg;
     alertBanner.classList.remove("hidden");
   }
+
+  // =========================================================================
+  // 8. INSPECTOR VISUAL DE PREPROCESAMIENTO Y RASGOS FACIALES
+  // =========================================================================
+  let timerAutoPipeline = null;
+  let muestrasDatasetCargadas = false;
+
+  const btnInspeccionarCam = document.getElementById("btn-inspeccionar-camara");
+  const chkPipelineAuto = document.getElementById("chk-pipeline-auto");
+  const selectDatasetMuestra = document.getElementById("select-dataset-muestra");
+  const btnInspeccionarDataset = document.getElementById("btn-inspeccionar-dataset");
+  const pipelineStatusMsg = document.getElementById("pipeline-status-msg");
+
+  function detenerAutoPipeline() {
+    if (timerAutoPipeline) {
+      clearInterval(timerAutoPipeline);
+      timerAutoPipeline = null;
+    }
+    if (chkPipelineAuto) chkPipelineAuto.checked = false;
+  }
+
+  if (btnInspeccionarCam) {
+    btnInspeccionarCam.addEventListener("click", () => inspeccionarCamaraPipeline());
+  }
+
+  if (chkPipelineAuto) {
+    chkPipelineAuto.addEventListener("change", () => {
+      if (chkPipelineAuto.checked) {
+        inspeccionarCamaraPipeline();
+        timerAutoPipeline = setInterval(() => {
+          if (pipelineLayout && !pipelineLayout.classList.contains("hidden")) {
+            inspeccionarCamaraPipeline();
+          } else {
+            detenerAutoPipeline();
+          }
+        }, 1500);
+      } else {
+        detenerAutoPipeline();
+      }
+    });
+  }
+
+  if (btnInspeccionarDataset) {
+    btnInspeccionarDataset.addEventListener("click", () => {
+      detenerAutoPipeline();
+      inspeccionarDatasetPipeline();
+    });
+  }
+
+  if (selectDatasetMuestra) {
+    selectDatasetMuestra.addEventListener("change", () => {
+      if (selectDatasetMuestra.value) {
+        detenerAutoPipeline();
+        inspeccionarDatasetPipeline();
+      }
+    });
+  }
+
+  async function cargarMuestrasDatasetPipeline() {
+    if (!selectDatasetMuestra || muestrasDatasetCargadas) return;
+    try {
+      const resp = await fetch("/api/pipeline/dataset_imagenes");
+      const data = await resp.json();
+      if (data.status === "ok" && Array.isArray(data.muestras)) {
+        selectDatasetMuestra.innerHTML = "";
+        const grupos = {};
+        data.muestras.forEach(m => {
+          if (!grupos[m.grupo]) grupos[m.grupo] = [];
+          grupos[m.grupo].push(m);
+        });
+        Object.keys(grupos).forEach(g => {
+          const optg = document.createElement("optgroup");
+          optg.label = g;
+          grupos[g].forEach(item => {
+            const opt = document.createElement("option");
+            opt.value = item.ruta;
+            opt.textContent = item.etiqueta;
+            optg.appendChild(opt);
+          });
+          selectDatasetMuestra.appendChild(optg);
+        });
+        muestrasDatasetCargadas = true;
+      }
+    } catch (e) {
+      console.error("Error cargando muestras de dataset:", e);
+    }
+  }
+
+  async function inspeccionarCamaraPipeline() {
+    if (pipelineStatusMsg) pipelineStatusMsg.classList.add("hidden");
+    try {
+      const resp = await fetch("/api/pipeline/inspeccionar_camara", { method: "POST" });
+      const data = await resp.json();
+      if (!resp.ok || data.status !== "ok") {
+        if (pipelineStatusMsg) {
+          pipelineStatusMsg.textContent = data.mensaje || "No se pudo obtener fotograma de cámara.";
+          pipelineStatusMsg.classList.remove("hidden");
+        }
+        return;
+      }
+      renderizarResultadoPipeline(data);
+    } catch (e) {
+      if (pipelineStatusMsg) {
+        pipelineStatusMsg.textContent = "Error de conexión con la cámara: " + e.message;
+        pipelineStatusMsg.classList.remove("hidden");
+      }
+    }
+  }
+
+  async function inspeccionarDatasetPipeline() {
+    if (!selectDatasetMuestra || !selectDatasetMuestra.value) return;
+    if (pipelineStatusMsg) pipelineStatusMsg.classList.add("hidden");
+    try {
+      const resp = await fetch("/api/pipeline/inspeccionar_dataset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruta: selectDatasetMuestra.value }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.status !== "ok") {
+        if (pipelineStatusMsg) {
+          pipelineStatusMsg.textContent = data.mensaje || "Error procesando imagen del dataset.";
+          pipelineStatusMsg.classList.remove("hidden");
+        }
+        return;
+      }
+      renderizarResultadoPipeline(data);
+    } catch (e) {
+      if (pipelineStatusMsg) {
+        pipelineStatusMsg.textContent = "Error de red: " + e.message;
+        pipelineStatusMsg.classList.remove("hidden");
+      }
+    }
+  }
+
+  function renderizarResultadoPipeline(data) {
+    const badgeOrigen = document.getElementById("badge-pipeline-origen");
+    if (badgeOrigen) badgeOrigen.textContent = data.origen || "Analizado";
+
+    // Fase 1: Detección
+    const f1 = data.fase_1_deteccion || {};
+    const imgDet = document.getElementById("img-pipe-deteccion");
+    if (imgDet && f1.imagen_deteccion_b64) {
+      imgDet.src = "data:image/png;base64," + f1.imagen_deteccion_b64;
+    }
+    const lblEst = document.getElementById("lbl-pipe-estado-det");
+    if (lblEst) {
+      lblEst.textContent = f1.estado || "—";
+      lblEst.className = "badge " + (f1.estado === "UN_ROSTRO" ? "badge-un-rostro" : "badge-sin-rostro");
+    }
+    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setTxt("lbl-pipe-rostros", f1.total_rostros ?? 0);
+    setTxt("lbl-pipe-angulo", `${f1.angulo_orientacion ?? 0}°`);
+    setTxt("lbl-pipe-recuadro", f1.recuadro ? `[${f1.recuadro.join(", ")}]` : "Sin recuadro");
+
+    // Fase 2: Preprocesamiento paso a paso real
+    const f2 = data.fase_2_preprocesamiento || {};
+    setTxt("lbl-pipe-metodo-prep", f2.metodo_extraccion || "—");
+    setTxt("lbl-pipe-recorte-titulo", f2.usa_alineacion ? "Alineado 5-Puntos (64×64)" : "Recorte Seguro (+10%)");
+    setTxt("lbl-pipe-kernel-gauss", f2.kernel_gaussiano || "5×5");
+    setTxt("lbl-pipe-sigma-gauss", f2.sigma_gaussiano ?? 0.5);
+
+    const setImg = (id, b64) => {
+      const el = document.getElementById(id);
+      if (el) el.src = b64 ? ("data:image/png;base64," + b64) : "";
+    };
+    setImg("img-pipe-recorte-usado", f2.recorte_usado_b64);
+    setImg("img-pipe-gris-64", f2.gris_64_b64);
+    setImg("img-pipe-gaussiano-64", f2.gaussiano_64_b64);
+    setImg("img-pipe-diff-gaussiano", f2.diff_gaussiano_b64);
+
+    const lblAlin = document.getElementById("lbl-pipe-alin-info");
+    if (lblAlin) {
+      if (f2.usa_alineacion && f2.angulo_alineacion_deg !== null) {
+        lblAlin.textContent = `Alineación 2D aplicada: rotación ${f2.angulo_alineacion_deg}°, escala ${f2.escala_alineacion}x → Gris 64×64 → Filtro Gaussiano ${f2.kernel_gaussiano} (σ=${f2.sigma_gaussiano}).`;
+      } else {
+        lblAlin.textContent = `Extracción → Gris 64×64 (INTER_AREA/LINEAR) → Normalización [0, 1] → Filtro Gaussiano ${f2.kernel_gaussiano || "5×5"} (σ=${f2.sigma_gaussiano ?? 0.5}).`;
+      }
+    }
+
+    const lblStats = document.getElementById("lbl-pipe-stats-tensor");
+    if (lblStats && f2.estadisticas_tensor) {
+      const st = f2.estadisticas_tensor;
+      lblStats.innerHTML = `
+        <span>Forma: <strong>${st.forma}</strong></span>
+        <span>Min/Max: <strong>${st.min} / ${st.max}</strong></span>
+        <span>Media±Std: <strong>${st.media} ± ${st.desv_std}</strong></span>
+      `;
+    }
+
+    // Fase 3: Rasgos Faciales estrictamente según el modelo activo
+    const f3 = data.fase_3_rasgos || {};
+    const contCnn = document.getElementById("contenedor-rasgos-cnn");
+    const contTex = document.getElementById("contenedor-rasgos-textura");
+    const contNinguno = document.getElementById("contenedor-rasgos-ninguno");
+    const badgeExt = document.getElementById("badge-pipe-extractor-activo");
+
+    if (contCnn) contCnn.classList.add("hidden");
+    if (contTex) contTex.classList.add("hidden");
+    if (contNinguno) contNinguno.classList.add("hidden");
+
+    if (f3.tipo_rasgos === "cnn") {
+      if (badgeExt) badgeExt.textContent = `CNN Convolucional (${f3.modelo_nombre || "Activa"})`;
+      if (contCnn) contCnn.classList.remove("hidden");
+      setImg("img-pipe-cnn-b1", f3.cnn_bloque1_b64);
+      setImg("img-pipe-cnn-b2", f3.cnn_bloque2_b64);
+      setImg("img-pipe-cnn-b3", f3.cnn_bloque3_b64);
+    } else if (f3.tipo_rasgos === "histogramas_4x4x16") {
+      if (badgeExt) badgeExt.textContent = `Histogramas Regionales 4×4×16 (${f3.modelo_nombre || "Activo"})`;
+      if (contTex) contTex.classList.remove("hidden");
+      setImg("img-pipe-cuadricula", f3.cuadricula_4x4_b64);
+      setImg("img-pipe-heatmap", f3.heatmap_histogramas_256_b64);
+      setTxt("lbl-pipe-norma-l2", f3.norma_l2_vector_256 ?? "—");
+    } else {
+      if (badgeExt) badgeExt.textContent = "Sin clasificador activo";
+      if (contNinguno) contNinguno.classList.remove("hidden");
+    }
+
+    // Fase 4: Clasificación
+    const f4 = data.fase_4_clasificacion || {};
+    const badgePuerta = document.getElementById("badge-pipe-puerta");
+    if (badgePuerta) {
+      const abierta = f4.decision_puerta === "ABIERTA";
+      badgePuerta.textContent = abierta ? "PUERTA ABIERTA" : "PUERTA CERRADA";
+      badgePuerta.className = "badge " + (abierta ? "badge-door-open" : "badge-door-closed");
+    }
+    setTxt("lbl-pipe-modelo", f4.modelo_activo || "Sin modelo");
+    setTxt("lbl-pipe-umbral", f4.umbral !== null && f4.umbral !== undefined ? `${f4.umbral}%` : "—");
+    setTxt("lbl-pipe-argmax", f4.clase_argmax || "—");
+    setTxt("lbl-pipe-score", f4.score_argmax !== null && f4.score_argmax !== undefined ? `${f4.score_argmax}%` : "—");
+    setTxt("lbl-pipe-motivo", f4.motivo || "—");
+
+    const boxProbs = document.getElementById("box-pipe-probs");
+    if (boxProbs) {
+      boxProbs.innerHTML = "";
+      if (f4.probabilidades) {
+        Object.entries(f4.probabilidades).forEach(([clase, pct]) => {
+          const esArgmax = clase === f4.clase_argmax;
+          const row = document.createElement("div");
+          row.className = "prob-bar-row";
+          row.innerHTML = `
+            <div class="prob-bar-label">
+              <span><strong>${clase}</strong></span>
+              <span>${pct.toFixed(2)}%</span>
+            </div>
+            <div class="prob-bar-track">
+              <div class="prob-bar-fill ${esArgmax ? "es-argmax" : ""}" style="width: ${Math.min(100, pct)}%"></div>
+            </div>
+          `;
+          boxProbs.appendChild(row);
+        });
+      }
+    }
+  }
+
+  async function sincronizarEstadoModeloInicial() {
+    try {
+      const resp = await fetch("/api/reconocimiento/estado");
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (sliderUmbral && data.umbral !== undefined) {
+        sliderUmbral.value = data.umbral;
+        lblUmbralValor.textContent = data.umbral + "%";
+      }
+      if (selectModeloRecon && data.modelo_activo) {
+        const nombre = String(data.modelo_activo);
+        if (nombre.includes("Estándar") || nombre.includes("0.61")) {
+          selectModeloRecon.value = "cnn_estandar_portal_061";
+        } else if (nombre.includes("Antialiasing") || nombre.includes("0.52")) {
+          selectModeloRecon.value = "cnn_antialiasing_052";
+        }
+      }
+    } catch (e) {
+      console.warn("No se pudo sincronizar el estado inicial del modelo:", e);
+    }
+  }
+
+  sincronizarEstadoModeloInicial();
 });

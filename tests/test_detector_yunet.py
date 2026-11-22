@@ -3,6 +3,7 @@ Pruebas unitarias para el detector alternativo YuNet (Deep Learning) y su compar
 """
 from pathlib import Path
 import unittest
+from unittest.mock import Mock, patch
 import cv2
 import numpy as np
 
@@ -17,6 +18,23 @@ class TestDetectorYuNet(unittest.TestCase):
         cls.detector = DetectorYuNet()
         cls.ruta_frontal = Path("data/propio/imagenes/persona_1/sesion_01/frontal/persona_1_sesion_01_frontal_f03.jpg")
         cls.ruta_perfil = Path("data/propio/imagenes/persona_1/sesion_02/izquierda/persona_1_sesion_02_izquierda_f06.jpg")
+
+    def test_detector_comun_en_web(self):
+        from reconocimiento.preprocesamiento.fabrica import crear_detector
+        from reconocimiento.web.streamer import GestorCamaraWeb
+        self.assertIsInstance(crear_detector(), DetectorYuNet)
+        gestor = GestorCamaraWeb()
+        try:
+            self.assertIsInstance(gestor.detector, DetectorYuNet)
+        finally:
+            gestor.detener()
+
+    def test_caja_parcial_no_se_desplaza(self):
+        motor = Mock()
+        motor.detect.return_value = (None, np.array([[-10, -5, 50, 40]], dtype=np.float32))
+        with patch.object(self.detector, "detector", motor):
+            resultado = self.detector.detectar(np.zeros((100, 100, 3), dtype=np.uint8))
+        self.assertEqual(resultado.recuadro, (0, 0, 40, 35))
 
     def test_deteccion_frontal_yunet(self):
         """Verifica detección de rostro frontal con YuNet."""

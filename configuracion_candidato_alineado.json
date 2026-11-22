@@ -1,0 +1,68 @@
+{
+  "candidato": {
+    "identificador": "cnn_4clases_alineada",
+    "nombre": "CNN 4 Clases (Experimental Con Alineación 5-Puntos)",
+    "tipo_arquitectura": "CNN",
+    "ruta_modelo": "resultados/desarrollo_4clases_alineado_20261119_223850/cnn/modelo.pt",
+    "sha256_modelo": "eefeaed013ce6bd4c590321720967c4ce4368dcac21f163384618e1b610326fb",
+    "umbral_score": 0.84,
+    "orden_clases": [
+      "persona_1",
+      "persona_2",
+      "persona_3",
+      "desconocido"
+    ],
+    "mapeo_clases": {
+      "0": "persona_1",
+      "1": "persona_2",
+      "2": "persona_3",
+      "3": "desconocido"
+    },
+    "personas_autorizadas": [
+      "persona_1",
+      "persona_2",
+      "persona_3"
+    ],
+    "fecha_congelamiento": "2026-11-20T15:38:59.000894",
+    "estado": "experimental_alineado"
+  },
+  "detector_facial": {
+    "tipo": "YuNet",
+    "ruta_modelo": "modelos/detector/face_detection_yunet_2023mar.onnx",
+    "sha256_modelo": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "parametros": {
+      "score_threshold": 0.6,
+      "nms_threshold": 0.3,
+      "margen_expansion": 0.1,
+      "modo_multiorientacion": "cascada",
+      "orientaciones_soportadas": [
+        0,
+        90,
+        180,
+        270
+      ]
+    }
+  },
+  "preprocesamiento": {
+    "metodo": "alineacion_5puntos",
+    "plantilla_canonica": "PLANTILLA_FACIAL_64x64",
+    "resolucion": [
+      64,
+      64
+    ],
+    "interpolacion": "INTER_AREA_o_LINEAR",
+    "borde": "BORDER_REFLECT_101",
+    "transformacion": "similitud_2d_sin_reflejo",
+    "normalizacion_intensidad": "float32_0_1",
+    "suavizado_gaussiano": {
+      "sigma": 0.5,
+      "kernel": "automatico"
+    }
+  },
+  "regla_acceso": {
+    "tipo": "regla_canonica_completa",
+    "restriccion_frr_persona_max": 0.3,
+    "decision_puerta_desconocido": "CERRADA_ESTRICTA",
+    "criterio_apertura": "score >= umbral_score AND clase_predicha IN personas_autorizadas AND deteccion == 'UN_ROSTRO'"
+  }
+}

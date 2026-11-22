@@ -39,6 +39,7 @@ class ClasificadorSVM(ClasificadorFacialBase):
         degree: int = 3,
         coef0: float = 0.0,
         probabilidad: bool = True,
+        class_weight: Optional[Any] = None,
         semilla: int = 42
     ):
         self.C = float(C)
@@ -47,6 +48,7 @@ class ClasificadorSVM(ClasificadorFacialBase):
         self.degree = int(degree)
         self.coef0 = float(coef0)
         self.probabilidad = probabilidad
+        self.class_weight = class_weight
         self.semilla = semilla
 
         self.escalador = StandardScaler()
@@ -57,22 +59,29 @@ class ClasificadorSVM(ClasificadorFacialBase):
             degree=self.degree,
             coef0=self.coef0,
             probability=self.probabilidad,
+            class_weight=self.class_weight,
             decision_function_shape="ovr",
             random_state=self.semilla
         )
         self.clases_: Optional[np.ndarray] = None
         self.n_vectores_soporte_: Optional[int] = None
 
-    def entrenar(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
+    def entrenar(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        sample_weight: Optional[np.ndarray] = None,
+    ) -> None:
         """
         Ajusta el escalador y el clasificador SVM exclusivamente con los datos de entrenamiento.
         """
         X_arr = np.asarray(X_train, dtype=np.float32)
         y_arr = np.asarray(y_train, dtype=np.int32)
+        sw = np.asarray(sample_weight, dtype=np.float32) if sample_weight is not None else None
 
         # Ajuste estricto del escalador solo en train
         X_scaled = self.escalador.fit_transform(X_arr)
-        self.modelo.fit(X_scaled, y_arr)
+        self.modelo.fit(X_scaled, y_arr, sample_weight=sw)
         self.clases_ = self.modelo.classes_
         self.n_vectores_soporte_ = int(np.sum(self.modelo.n_support_))
 
@@ -145,6 +154,9 @@ class ClasificadorSVM(ClasificadorFacialBase):
         y_train: np.ndarray,
         X_val: np.ndarray,
         y_val: np.ndarray,
+        class_weight: Optional[Any] = None,
+        sample_weight: Optional[np.ndarray] = None,
+        metrica: str = "acc",
         semilla: int = 42
     ) -> Tuple["ClasificadorSVM", List[Dict[str, Any]], Dict[str, Any]]:
         """
@@ -152,7 +164,7 @@ class ClasificadorSVM(ClasificadorFacialBase):
         - Kernels: 'linear', 'rbf', 'poly'
         - C: 0.1, 1.0, 10.0, 100.0
         - gamma: 'scale', 'auto', 0.01, 0.1
-        Selecciona la configuración con mayor exactitud en validación.
+        Selecciona la configuración con mayor score ('acc' o 'macro_recall') en validación.
         """
         configuraciones_a_probar = [
             {"kernel": "linear", "C": 0.1, "gamma": "scale", "degree": 3, "coef0": 0.0},
@@ -171,7 +183,7 @@ class ClasificadorSVM(ClasificadorFacialBase):
         ]
 
         historial_validaciones: List[Dict[str, Any]] = []
-        mejor_exactitud_val = -1.0
+        mejor_score_val = -1.0
         mejor_cfg = configuraciones_a_probar[1]
 
         for cfg in configuraciones_a_probar:
@@ -182,14 +194,25 @@ class ClasificadorSVM(ClasificadorFacialBase):
                 degree=cfg["degree"],
                 coef0=cfg["coef0"],
                 probabilidad=False,  # Más rápido para búsqueda en validación
+                class_weight=class_weight,
                 semilla=semilla
             )
             t0 = time.perf_counter()
-            candidato.entrenar(X_train, y_train)
+            candidato.entrenar(X_train, y_train, sample_weight=sample_weight)
             tiempo_fit = time.perf_counter() - t0
 
             y_val_pred = candidato.predecir(X_val)
             acc_val = float(np.mean(y_val_pred == y_val) * 100.0)
+
+            if metrica == "macro_recall":
+                recalls = []
+                for c in np.unique(y_val):
+                    mask = (y_val == c)
+                    if np.sum(mask) > 0:
+                        recalls.append(float(np.mean(y_val_pred[mask] == c)) * 100.0)
+                score_val = float(np.mean(recalls)) if recalls else acc_val
+            else:
+                score_val = acc_val
 
             registro = {
                 "kernel": cfg["kernel"],
@@ -199,12 +222,13 @@ class ClasificadorSVM(ClasificadorFacialBase):
                 "coef0": cfg["coef0"],
                 "n_vectores_soporte": candidato.n_vectores_soporte_,
                 "exactitud_validacion": round(acc_val, 2),
+                "score_validacion": round(score_val, 2),
                 "tiempo_entrenamiento_s": round(tiempo_fit, 4)
             }
             historial_validaciones.append(registro)
 
-            if acc_val > mejor_exactitud_val:
-                mejor_exactitud_val = acc_val
+            if score_val > mejor_score_val:
+                mejor_score_val = score_val
                 mejor_cfg = cfg
 
         # Entrenar modelo final seleccionado con calibración de probabilidad activa
@@ -215,9 +239,10 @@ class ClasificadorSVM(ClasificadorFacialBase):
             degree=mejor_cfg["degree"],
             coef0=mejor_cfg["coef0"],
             probabilidad=True,
+            class_weight=class_weight,
             semilla=semilla
         )
-        modelo_elegido.entrenar(X_train, y_train)
+        modelo_elegido.entrenar(X_train, y_train, sample_weight=sample_weight)
 
         return modelo_elegido, historial_validaciones, mejor_cfg
 

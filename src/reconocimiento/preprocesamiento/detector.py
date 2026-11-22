@@ -5,7 +5,7 @@ asegura el recorte con preservación de relación de aspecto y padding seguro en
 """
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
@@ -24,6 +24,11 @@ class ResultadoDeteccion:
     total_rostros_detectados: int
     rostro_recortado: Optional[np.ndarray] = None
     mensaje: str = ""
+    puntos_faciales: Optional[np.ndarray] = None  # (5, 2) coords originales [ojos, nariz, comisuras]
+    angulo_orientacion: int = 0                    # 0, 90, 180, 270
+    confianza_deteccion: float = 0.0               # Score de detección de YuNet
+    recorte_alineado: Optional[np.ndarray] = None  # Recorte alineado a plantilla 64x64
+    metadatos_alineacion: Optional[Dict[str, Any]] = None  # Metadatos de la alineación
 
 
 class DetectorFacial:

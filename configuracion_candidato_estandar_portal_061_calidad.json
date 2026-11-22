@@ -1,0 +1,82 @@
+{
+  "candidato": {
+    "identificador": "cnn_estandar_portal_completo_061_calidad",
+    "nombre": "CNN Estándar 0.61 + Filtro Calidad (Fase 1)",
+    "tipo_arquitectura": "CNN",
+    "ruta_modelo": "resultados/exp_4clases_portal_completo_20261120_200452/cnn/modelo.pt",
+    "sha256_modelo": "24d3a1ed14cd8750863ff5bf464185c22eaef02bf4313044b64747929bd636f9",
+    "umbral_score": 0.61,
+    "orden_clases": [
+      "persona_1",
+      "persona_2",
+      "persona_3",
+      "desconocido"
+    ],
+    "mapeo_clases": {
+      "0": "persona_1",
+      "1": "persona_2",
+      "2": "persona_3",
+      "3": "desconocido"
+    },
+    "personas_autorizadas": [
+      "persona_1",
+      "persona_2",
+      "persona_3"
+    ],
+    "fecha_propuesta": "2026-11-21T15:46:00",
+    "estado": "fase1_experimental_sin_reentrenar"
+  },
+  "detector_facial": {
+    "tipo": "YuNet",
+    "ruta_modelo": "modelos/detector/face_detection_yunet_2023mar.onnx",
+    "sha256_modelo": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "parametros": {
+      "score_threshold": 0.6,
+      "nms_threshold": 0.3,
+      "margen_expansion": 0.1,
+      "modo_multiorientacion": "cascada",
+      "orientaciones_soportadas": [
+        0,
+        90,
+        180,
+        270
+      ]
+    }
+  },
+  "preprocesamiento": {
+    "metodo": "alineacion_5puntos",
+    "plantilla_canonica": "PLANTILLA_FACIAL_64x64",
+    "resolucion": [
+      64,
+      64
+    ],
+    "interpolacion": "INTER_AREA_o_LINEAR",
+    "borde": "BORDER_REFLECT_101",
+    "transformacion": "similitud_2d_sin_reflejo",
+    "normalizacion_intensidad": "float32_0_1",
+    "suavizado_gaussiano": {
+      "sigma": 0.5,
+      "kernel": "automatico"
+    },
+    "metodo_remuestreo": "estandar",
+    "parametros_remuestreo": {
+      "metodo": "estandar",
+      "nota": "Mismo preprocesamiento exacto de CNN Estándar 0.61"
+    }
+  },
+  "filtro_calidad": {
+    "habilitado": true,
+    "min_luminancia_media": 58.0,
+    "min_contraste_std": 18.0,
+    "max_fraccion_oscura_inferior": 0.35,
+    "min_gradiente_inferior": 4.2,
+    "min_tamano_rostro_px": 36,
+    "margen_minimo": 0.25
+  },
+  "regla_acceso": {
+    "tipo": "regla_canonica_completa",
+    "restriccion_frr_persona_max": 0.3,
+    "decision_puerta_desconocido": "CERRADA_ESTRICTA",
+    "criterio_apertura": "calidad_ok AND score >= umbral_score AND margen >= 0.25 AND clase_predicha IN personas_autorizadas AND deteccion == 'UN_ROSTRO'"
+  }
+}

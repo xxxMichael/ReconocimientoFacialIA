@@ -14,6 +14,74 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 POSES_VALIDAS = {"frontal", "izquierda", "derecha", "arriba", "abajo"}
 PARTICIONES_VALIDAS = {"entrenamiento", "validacion", "prueba"}
 TIPOS_SUJETO_VALIDOS = {"autorizado", "desconocido"}
+DESTINOS_DESCONOCIDOS_VALIDOS = {"desconocidos_ajuste", "desconocidos_calibracion", "desconocidos_prueba"}
+DISTANCIAS_VALIDAS = {"cercana", "media", "lejana"}
+PERSONAS_AUTORIZADAS_PROPIO = {"persona_1", "persona_2", "persona_3"}
+
+MAPEO_GRUPO_PARTICION_DESCONOCIDOS: Dict[str, str] = {
+    "desconocidos_ajuste": "entrenamiento",
+    "desconocidos_calibracion": "validacion",
+    "desconocidos_prueba": "prueba",
+}
+
+
+def normalizar_identificador(identificador: str) -> str:
+    """Normaliza identificadores de personas o muestras (limpieza de espacios en blanco y minúsculas)."""
+    return str(identificador).strip().lower()
+
+# Regla canónica del protocolo para el dataset propio:
+# - sesion_01, sesion_02 y sesion_03 → entrenamiento
+# - sesion_04 → validacion
+# - sesion_05 → prueba
+MAPEO_SESION_PARTICION_PROPIO: Dict[str, str] = {
+    # Sesiones base del protocolo
+    "sesion_01": "entrenamiento",
+    "sesion_02": "entrenamiento",
+    "sesion_03": "entrenamiento",
+    "sesion_04": "validacion",
+    "sesion_05": "prueba",
+    # Sesiones adicionales de entrenamiento con variación de escala (distancia física a cámara)
+    "sesion_cercana": "entrenamiento",
+    "sesion_media": "entrenamiento",
+    "sesion_lejana": "entrenamiento",
+    "sesion_06_cercana": "entrenamiento",
+    "sesion_07_media": "entrenamiento",
+    "sesion_08_lejana": "entrenamiento",
+    "sesion_06": "entrenamiento",
+    "sesion_07": "entrenamiento",
+    "sesion_08": "entrenamiento",
+}
+
+
+def es_manifiesto_propio(ruta: Path) -> bool:
+    """Aplica el protocolo sólo a manifiestos ubicados en el dataset propio."""
+    p = Path(ruta).resolve()
+    if Path("data/propio").resolve() in p.parents:
+        return True
+    return ("propio" in p.parts and "ensayos" not in p.parts)
+
+
+def obtener_particion_esperada_propio(sesion: str) -> Optional[str]:
+    """Retorna la partición reglamentaria según el protocolo del dataset propio, o None si no aplica."""
+    return MAPEO_SESION_PARTICION_PROPIO.get(str(sesion).strip().lower())
+
+
+def validar_coherencia_sesion_particion_propio(sesion: str, particion: str) -> Tuple[bool, str]:
+    """
+    Valida la relación estricta entre sesión y partición para el dataset propio.
+    Retorna (es_valido, mensaje_error).
+    No aplica a sesiones que no pertenezcan al protocolo del dataset propio (ej. modo ensayo).
+    """
+    ses_limpia = str(sesion).strip().lower()
+    part_limpia = str(particion).strip().lower()
+    if ses_limpia in MAPEO_SESION_PARTICION_PROPIO:
+        esperada = MAPEO_SESION_PARTICION_PROPIO[ses_limpia]
+        if part_limpia != esperada:
+            return False, (
+                f"Inconsistencia de protocolo: La sesión '{sesion}' del dataset propio "
+                f"debe pertenecer estrictamente a la partición '{esperada}', pero se especificó '{particion}'."
+            )
+    return True, ""
 
 
 def calcular_hash_archivo(ruta: Path) -> str:
@@ -107,6 +175,18 @@ class RegistroCaptura:
         meta = self.obtener_metadatos_anotaciones()
         return meta.get("origen_caja", "")
 
+    @property
+    def destino_experimental(self) -> Optional[str]:
+        """Grupo experimental para sujetos desconocidos ('desconocidos_ajuste', 'desconocidos_calibracion', 'desconocidos_prueba')."""
+        meta = self.obtener_metadatos_anotaciones()
+        return meta.get("destino")
+
+    @property
+    def distancia(self) -> Optional[str]:
+        """Distancia de captura: 'cercana', 'media' o 'lejana'."""
+        meta = self.obtener_metadatos_anotaciones()
+        return meta.get("distancia")
+
     def actualizar_revision(
         self,
         decision: str,
@@ -144,6 +224,9 @@ class RegistroCaptura:
         """Verifica que los campos contengan valores dentro del dominio acordado."""
         if not self.identificador:
             raise ValueError("El identificador no puede estar vacío.")
+        self.persona = normalizar_identificador(self.persona)
+        if not self.persona:
+            raise ValueError("El identificador de persona no puede estar vacío.")
         if self.pose not in POSES_VALIDAS:
             raise ValueError(f"Pose '{self.pose}' inválida. Opciones: {sorted(POSES_VALIDAS)}")
         if self.particion not in PARTICIONES_VALIDAS:
@@ -152,6 +235,42 @@ class RegistroCaptura:
             raise ValueError(f"Tipo de sujeto '{self.tipo_sujeto}' inválido. Opciones: {sorted(TIPOS_SUJETO_VALIDOS)}")
         if not self.consentimiento:
             raise ValueError("No se puede registrar una captura sin consentimiento informado explícito.")
+
+        if self.tipo_sujeto == "desconocido":
+            if self.persona in PERSONAS_AUTORIZADAS_PROPIO:
+                raise ValueError(
+                    f"Conflicto de rol: La identidad '{self.persona}' es una persona autorizada y no puede registrarse como desconocido."
+                )
+            dest = self.destino_experimental
+            if not dest:
+                raise ValueError("El destino experimental es obligatorio para sujetos desconocidos.")
+            if dest not in DESTINOS_DESCONOCIDOS_VALIDOS:
+                raise ValueError(
+                    f"Destino experimental '{dest}' inválido. Opciones válidas: {sorted(DESTINOS_DESCONOCIDOS_VALIDOS)}"
+                )
+            dist = self.distancia
+            if not dist:
+                raise ValueError("La distancia de captura es obligatoria para sujetos desconocidos.")
+            if dist not in DISTANCIAS_VALIDAS:
+                raise ValueError(
+                    f"Distancia '{dist}' inválida. Opciones válidas: {sorted(DISTANCIAS_VALIDAS)}"
+                )
+            part_esperada = MAPEO_GRUPO_PARTICION_DESCONOCIDOS.get(dest)
+            if self.particion != part_esperada:
+                raise ValueError(
+                    f"Inconsistencia de partición: El grupo '{dest}' debe corresponder a la partición '{part_esperada}', pero se especificó '{self.particion}'."
+                )
+        elif self.tipo_sujeto == "autorizado":
+            dest = self.destino_experimental
+            if dest in DESTINOS_DESCONOCIDOS_VALIDOS:
+                raise ValueError(
+                    f"Conflicto de rol: Un sujeto autorizado no puede asignarse a un grupo de desconocidos '{dest}'."
+                )
+            dist = self.distancia
+            if dist is not None and dist not in DISTANCIAS_VALIDAS:
+                raise ValueError(
+                    f"Distancia '{dist}' inválida. Opciones válidas: {sorted(DISTANCIAS_VALIDAS)}"
+                )
 
         # Calcular hash de contenido automáticamente si el archivo existe en disco y no se suministró hash
         if not self.hash_contenido and self.ruta:
@@ -165,6 +284,11 @@ class ManifiestoDataset:
 
     def __init__(self, ruta_archivo: Optional[Path] = None):
         self.ruta_archivo = Path(ruta_archivo) if ruta_archivo else Path("data/propio/manifiesto.csv")
+        # Una instalación que reúne varios participantes conserva su índice privado.
+        if self.ruta_archivo.resolve() == Path("data/propio/manifiesto.csv").resolve():
+            local = self.ruta_archivo.with_name("manifiesto_local.csv")
+            if local.is_file():
+                self.ruta_archivo = local
         self.registros: List[RegistroCaptura] = []
         if self.ruta_archivo.exists():
             self.cargar()
@@ -175,6 +299,13 @@ class ManifiestoDataset:
 
     def agregar_registro(self, registro: RegistroCaptura) -> None:
         registro.validar()
+
+        # Validar coherencia estricta de sesion-particion en el dataset propio (manifiesto real o local) solo para autorizados
+        if es_manifiesto_propio(self.ruta_archivo) and registro.tipo_sujeto == "autorizado":
+            es_val, err_msg = validar_coherencia_sesion_particion_propio(registro.sesion, registro.particion)
+            if not es_val:
+                raise ValueError(err_msg)
+
         # Verificar identificador único
         for r in self.registros:
             if r.identificador == registro.identificador:
@@ -195,6 +326,30 @@ class ManifiestoDataset:
                         f"pero están en particiones distintas ('{registro.particion}' vs '{r.particion}'). "
                         f"Rechazado para evitar inflar la exactitud del modelo."
                     )
+
+        # Validar aislamiento de identidad para sujetos desconocidos
+        if registro.tipo_sujeto == "desconocido":
+            dest_nuevo = registro.destino_experimental or registro.particion
+            for r in self.registros:
+                if r.tipo_sujeto == "desconocido" and r.persona == registro.persona:
+                    dest_existente = r.destino_experimental or r.particion
+                    if dest_existente != dest_nuevo:
+                        raise ValueError(
+                            f"Fuga de identidad externa: El voluntario desconocido '{registro.persona}' ya está asignado "
+                            f"al grupo '{dest_existente}' y no puede registrarse en '{dest_nuevo}'. "
+                            f"Cada voluntario desconocido debe pertenecer a un único grupo experimental."
+                        )
+                if r.tipo_sujeto == "autorizado" and r.persona == registro.persona:
+                    raise ValueError(
+                        f"Conflicto de identidad: '{registro.persona}' ya existe como persona autorizada y no puede añadirse como desconocido."
+                    )
+        elif registro.tipo_sujeto == "autorizado":
+            for r in self.registros:
+                if r.tipo_sujeto == "desconocido" and r.persona == registro.persona:
+                    raise ValueError(
+                        f"Conflicto de identidad: '{registro.persona}' ya existe como sujeto desconocido y no puede añadirse como autorizado."
+                    )
+
         self.registros.append(registro)
 
     def guardar(self) -> None:
@@ -326,26 +481,179 @@ class ManifiestoDataset:
 
         return (len(errores) == 0, errores)
 
+    def validar_aislamiento_desconocidos(self) -> Tuple[bool, List[str]]:
+        """
+        Garantiza que:
+        1. Ninguna identidad externa de voluntario desconocido aparezca en más de un grupo experimental
+           ('desconocidos_ajuste', 'desconocidos_calibracion', 'desconocidos_prueba').
+           El aislamiento debe ser a nivel de sujeto/persona, no únicamente de fotos.
+        2. Ningún voluntario desconocido comparta identificador con personas autorizadas.
+        3. Todos los registros de tipo desconocido cuenten con consentimiento informado explícito.
+        Retorna (es_valido, lista_errores).
+        """
+        errores = []
+        destinos_por_persona: Dict[str, Set[str]] = {}
+
+        for r in self.registros:
+            if r.tipo_sujeto == "desconocido":
+                if r.persona in PERSONAS_AUTORIZADAS_PROPIO:
+                    errores.append(
+                        f"Violación de rol: Sujeto desconocido registrado con nombre de autorizado: '{r.persona}' (id: {r.identificador})"
+                    )
+                if not r.consentimiento:
+                    errores.append(
+                        f"Violación ética: Sujeto desconocido '{r.persona}' sin consentimiento informado (id: {r.identificador})"
+                    )
+                dest = r.destino_experimental or r.particion
+                if r.persona not in destinos_por_persona:
+                    destinos_por_persona[r.persona] = set()
+                destinos_por_persona[r.persona].add(dest)
+
+        for persona, dests in destinos_por_persona.items():
+            if len(dests) > 1:
+                errores.append(
+                    f"Fuga de identidad externa: El voluntario desconocido '{persona}' aparece en múltiples "
+                    f"grupos experimentales: {sorted(dests)}. El protocolo exige asignación disjunta por sujeto."
+                )
+
+        return (len(errores) == 0, errores)
+
+    def verificar_cobertura_desconocidos(self) -> Dict[str, Any]:
+        """
+        Verifica el cumplimiento de cobertura para el protocolo piloto de sujetos desconocidos:
+        - 3 grupos experimentales: desconocidos_ajuste, desconocidos_calibracion, desconocidos_prueba.
+        - Mínimo 2 voluntarios distintos por grupo.
+        - Por cada voluntario: 15 capturas válidas (3 distancias x 5 poses).
+        - Desglose de estado de revisión humana (aprobada/corregida vs pendiente/excluida).
+        - No marca un grupo como completo antes de cubrir todas las combinaciones y revisiones exigidas.
+        """
+        cobertura_grupos = {}
+        todos_grupos_completos = True
+
+        for grupo in sorted(list(DESTINOS_DESCONOCIDOS_VALIDOS)):
+            part_esperada = MAPEO_GRUPO_PARTICION_DESCONOCIDOS[grupo]
+            muestras_grupo = [
+                r for r in self.registros
+                if r.tipo_sujeto == "desconocido" and (r.destino_experimental == grupo or (not r.destino_experimental and r.particion == part_esperada))
+            ]
+            voluntarios = sorted(list(set(r.persona for r in muestras_grupo)))
+            desglose_voluntarios = {}
+            voluntarios_completos = 0
+
+            for vol in voluntarios:
+                muestras_vol = [r for r in muestras_grupo if r.persona == vol]
+                combinaciones_presentes: Dict[Tuple[str, str], int] = {}
+                combinaciones_aprobadas: Dict[Tuple[str, str], int] = {}
+                total_fallos = 0
+                total_validas = 0
+                total_aprobadas = 0
+                total_pendientes = 0
+                total_excluidas = 0
+
+                for d in DISTANCIAS_VALIDAS:
+                    for p in POSES_VALIDAS:
+                        combinaciones_presentes[(d, p)] = 0
+                        combinaciones_aprobadas[(d, p)] = 0
+
+                for r in muestras_vol:
+                    es_fallo = ("modo=fallo" in r.anotaciones) or ("forzado=si" in r.anotaciones)
+                    if es_fallo:
+                        total_fallos += 1
+                    else:
+                        total_validas += 1
+                        d = r.distancia or ""
+                        p = r.pose or ""
+                        if (d, p) in combinaciones_presentes:
+                            combinaciones_presentes[(d, p)] += 1
+                            if r.decision_humana in {"aprobada", "corregida"}:
+                                combinaciones_aprobadas[(d, p)] += 1
+
+                    if r.decision_humana in {"aprobada", "corregida"}:
+                        total_aprobadas += 1
+                    elif r.decision_humana == "excluida":
+                        total_excluidas += 1
+                    else:
+                        total_pendientes += 1
+
+                # Para considerarse completo un voluntario:
+                # Debe tener las 15 combinaciones cubiertas y con al menos 1 captura aprobada/corregida,
+                # sin capturas pendientes ni excluidas que invaliden la serie.
+                cubiertas_15 = all(v >= 1 for v in combinaciones_presentes.values())
+                aprobadas_15 = all(v >= 1 for v in combinaciones_aprobadas.values())
+                vol_completo = cubiertas_15 and aprobadas_15 and (total_pendientes == 0) and (total_excluidas == 0)
+                if vol_completo:
+                    voluntarios_completos += 1
+
+                desglose_voluntarios[vol] = {
+                    "total_capturas": len(muestras_vol),
+                    "total_validas": total_validas,
+                    "total_fallos": total_fallos,
+                    "total_aprobadas": total_aprobadas,
+                    "total_pendientes": total_pendientes,
+                    "total_excluidas": total_excluidas,
+                    "cubiertas_15_combinaciones": cubiertas_15,
+                    "aprobadas_15_combinaciones": aprobadas_15,
+                    "completo": vol_completo
+                }
+
+            grupo_completo = (len(voluntarios) >= 2) and (voluntarios_completos >= 2)
+            if not grupo_completo:
+                todos_grupos_completos = False
+
+            cobertura_grupos[grupo] = {
+                "particion": part_esperada,
+                "total_voluntarios": len(voluntarios),
+                "voluntarios": voluntarios,
+                "voluntarios_completos": voluntarios_completos,
+                "total_capturas": len(muestras_grupo),
+                "completo": grupo_completo,
+                "desglose_voluntarios": desglose_voluntarios
+            }
+
+        return {
+            "todos_grupos_completos": todos_grupos_completos,
+            "grupos": cobertura_grupos
+        }
+
     def resumen_conteo(self) -> Dict[str, Any]:
-        """Genera conteo de muestras por persona, sesión, pose y partición."""
+        """Genera conteo de muestras por persona, sesión, pose y partición, incluyendo grupos de desconocidos."""
         por_particion = {"entrenamiento": 0, "validacion": 0, "prueba": 0}
         por_persona: Dict[str, int] = {}
         por_pose: Dict[str, int] = {}
-        desconocidos = 0
+        desconocidos_por_grupo = {g: {"voluntarios": set(), "capturas": 0} for g in DESTINOS_DESCONOCIDOS_VALIDOS}
+        desconocidos_total = 0
 
         for r in self.registros:
             por_particion[r.particion] = por_particion.get(r.particion, 0) + 1
             por_persona[r.persona] = por_persona.get(r.persona, 0) + 1
             por_pose[r.pose] = por_pose.get(r.pose, 0) + 1
             if r.tipo_sujeto == "desconocido":
-                desconocidos += 1
+                desconocidos_total += 1
+                dest = r.destino_experimental or (
+                    "desconocidos_ajuste" if r.particion == "entrenamiento" else
+                    "desconocidos_calibracion" if r.particion == "validacion" else "desconocidos_prueba"
+                )
+                if dest in desconocidos_por_grupo:
+                    desconocidos_por_grupo[dest]["voluntarios"].add(r.persona)
+                    desconocidos_por_grupo[dest]["capturas"] += 1
+
+        desconocidos_resumen = {
+            g: {
+                "voluntarios": len(info["voluntarios"]),
+                "lista_voluntarios": sorted(list(info["voluntarios"])),
+                "capturas": info["capturas"],
+                "completo": len(info["voluntarios"]) > 0
+            }
+            for g, info in desconocidos_por_grupo.items()
+        }
 
         return {
             "total_muestras": len(self.registros),
             "por_particion": por_particion,
             "por_persona": por_persona,
             "por_pose": por_pose,
-            "desconocidos": desconocidos
+            "desconocidos": desconocidos_total,
+            "desconocidos_por_grupo": desconocidos_resumen
         }
 
     def verificar_protocolo_completo(self) -> Dict[str, Any]:
@@ -436,7 +744,10 @@ def generar_manifiesto_plantilla_300() -> ManifiestoDataset:
     - Sesión 4         -> validación (20%, 60 fotos)
     - Sesión 5         -> prueba (20%, 60 fotos)
     """
-    manifiesto = ManifiestoDataset(Path("data/propio/manifiesto_plantilla_300.csv"))
+    ruta_p = Path("data/propio/manifiesto_plantilla_300.csv")
+    if ruta_p.exists():
+        ruta_p.unlink()
+    manifiesto = ManifiestoDataset(ruta_p)
     manifiesto.registros.clear()
 
     personas = ["persona_1", "persona_2", "persona_3"]
@@ -485,7 +796,7 @@ def generar_manifiesto_plantilla_300() -> ManifiestoDataset:
                 pose=pose,
                 particion="prueba",
                 consentimiento=True,
-                anotaciones="Voluntario no autorizado para prueba de rechazo"
+                anotaciones="destino=desconocidos_prueba;distancia=media;Voluntario no autorizado para prueba de rechazo"
             )
             manifiesto.agregar_registro(registro)
 

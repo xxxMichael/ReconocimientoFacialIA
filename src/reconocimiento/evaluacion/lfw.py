@@ -14,6 +14,7 @@ from sklearn.datasets import fetch_lfw_people
 
 from reconocimiento.clasificacion.cnn import ClasificadorCNN
 from reconocimiento.clasificacion.regla_acceso import evaluar_decision_acceso
+from reconocimiento.preprocesamiento.fabrica import crear_detector
 from reconocimiento.preprocesamiento.detector import DetectorFacial, EstadoDeteccion
 from reconocimiento.preprocesamiento.filtros import suavizado_gaussiano
 from reconocimiento.preprocesamiento.normalizador import (
@@ -118,16 +119,13 @@ def verificar_y_congelar_configuracion(
     sha256_pesos = calcular_sha256(ruta_pesos)
 
     # Detector de producción por defecto
-    det_prod = DetectorFacial()
+    det_prod = crear_detector()
     detector_config = {
-        "tipo": "Haar Cascade Multi-Vista (Frontal + Perfil directo + Perfil reflejado)",
-        "scale_factor": det_prod.scale_factor,
-        "min_neighbors": det_prod.min_neighbors,
-        "min_size": list(det_prod.min_size),
+        "tipo": "YuNet",
+        "sha256_onnx": calcular_sha256(det_prod.ruta_modelo),
+        "score_threshold": det_prod.score_threshold,
+        "nms_threshold": det_prod.nms_threshold,
         "margen_expansion": det_prod.margen_expansion,
-        "umbral_iou_fusion": det_prod.umbral_iou_fusion,
-        "umbral_iomin_fusion": det_prod.umbral_iomin_fusion,
-        "habilitar_perfil": det_prod.habilitar_perfil,
     }
 
     config_congelada = {
@@ -384,7 +382,7 @@ def evaluar_lfw_cnn(
     # 3. Cargar modelo y detector de producción
     print("\n--- Paso 3: Cargar modelo y detector en memoria ---")
     modelo = ClasificadorCNN.cargar(Path(config["ruta_pesos"]))
-    detector = DetectorFacial()
+    detector = crear_detector()
     clases_autorizadas = config["clases_autorizadas"]
     id_to_persona = config["id_to_persona"]
     umbral = config["umbral_efectivo_puerta"]
@@ -637,7 +635,7 @@ Cada apertura falsa representa a un individuo externo de LFW que fue clasificado
 ## 4. Pipeline de Inferencia Idéntico a Producción
 
 Para cada fotografía de LFW se ejecutó la misma lógica que aplica `GestorCamaraWeb` en la web:
-1. **Detección Multi-Vista:** `DetectorFacial.detectar(img_bgr, es_pre_recortada=False)` utilizando las cascadas de Haar frontal y de perfil (evaluado directo y con reflejo horizontal).
+1. **Detección Multi-Vista:** `DetectorYuNet.detectar(img_bgr, es_pre_recortada=False)` utilizando el modelo ONNX común de producción.
 2. **Condiciones de Seguridad:**
    - Si el detector reporta `SIN_ROSTRO` $\\rightarrow$ La puerta se mantiene **CERRADA** (Motivo: `SIN_ROSTRO`).
    - Si el detector reporta `VARIOS_ROSTROS` $\\rightarrow$ La puerta se mantiene **CERRADA** (Motivo: `VARIOS_ROSTROS`).
@@ -666,7 +664,7 @@ Para cada fotografía de LFW se ejecutó la misma lógica que aplica `GestorCama
 > La red convolucional actual fue entrenada con una capa final de activación Softmax sobre 3 clases conocidas (`persona_1`, `persona_2`, `persona_3`). Softmax fuerza que la suma de probabilidades sobre las 3 clases sea idénticamente 1.0 ($100\\%$).
 > 
 > Cuando una persona externa completamente desconocida se presenta ante el sistema:
-> 1. El detector Haar localiza exitosamente el rostro ({conteo_un_rostro}/100 casos).
+> 1. El detector YuNet localiza exitosamente el rostro ({conteo_un_rostro}/100 casos).
 > 2. La CNN proyecta las características del rostro desconocido en el espacio latente de las 3 personas conocidas.
 > 3. Aunque la persona no se parece a ninguna de las 3, una de las 3 neuronas de salida puede superar el umbral de confianza del 65% simplemente por estar ligeramente más cerca de ese cluster que de los otros dos en la frontera de decisión lineal final.
 

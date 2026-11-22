@@ -7,7 +7,10 @@ from reconocimiento.adquisicion.propio import (
     RegistroCaptura,
     generar_manifiesto_plantilla_300,
     POSES_VALIDAS,
-    PARTICIONES_VALIDAS
+    PARTICIONES_VALIDAS,
+    MAPEO_SESION_PARTICION_PROPIO,
+    obtener_particion_esperada_propio,
+    validar_coherencia_sesion_particion_propio
 )
 from reconocimiento.adquisicion.camara import (
     CapturadorCamara,
@@ -26,6 +29,9 @@ __all__ = [
     "generar_manifiesto_plantilla_300",
     "POSES_VALIDAS",
     "PARTICIONES_VALIDAS",
+    "MAPEO_SESION_PARTICION_PROPIO",
+    "obtener_particion_esperada_propio",
+    "validar_coherencia_sesion_particion_propio",
     "CapturadorCamara",
     "sondear_camaras",
     "ejecutar_vista_previa",

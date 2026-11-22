@@ -1,0 +1,717 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+
+\setlength{\emergencystretch}{3em}
+
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    citecolor=black
+}
+
+\title{\textbf{Diseño, Implementación y Evaluación Experimental de un Sistema de Reconocimiento Facial en Conjunto Abierto para Control de Acceso Simulado Basado en Visión por Computador y Aprendizaje Automático}}
+\author{Proyecto Académico de Inteligencia Artificial II \\ Séptimo Semestre --- Ingeniería en Sistemas / Computación}
+\date{21 de noviembre de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+El presente informe documenta de manera rigurosa el desarrollo integral de un sistema de reconocimiento facial e identificación biométrica en conjunto abierto (\textit{open-set}) orientado a la simulación de control de acceso físico (apertura y bloqueo de puerta). El proyecto se estructura estrictamente bajo un flujo de trabajo (\textit{pipeline}) de aprendizaje automático de cuatro fases: (1) adquisición y obtención de datos, (2) preprocesamiento espacial de imagen, (3) extracción de características y (4) clasificación supervisada acoplada a una regla determinista de decisión de acceso, excluyendo por diseño cualquier etapa de postprocesamiento. En la fase de preprocesamiento se establece una separación funcional estricta entre la localización facial y la identificación: la red neuronal profunda ligera YuNet (\texttt{face\_detection\_yunet\_2023mar.onnx}) se utiliza única y exclusivamente para ubicar el recuadro delimitador del rostro y sus cinco puntos anatómicos de referencia bajo una estrategia multi-orientación en cascada ($0^\circ, 90^\circ, 270^\circ, 180^\circ$), sin intervenir jamás en la predicción de identidad. A partir de dichos puntos se aplica una transformación geométrica de similitud bidimensional sin reflejo hacia una plantilla canónica de $64 \times 64$ píxeles, seguida de conversión a luminancia en escala de grises, normalización radiométrica y filtrado espacial mediante convolución discreta bidimensional con máscaras (incluyendo suavizado pasa-bajos gaussiano con $\sigma = 0.5$ y máscara $5 \times 5$, análisis de filtros espaciales de acentuado pasa-altos con máscara $3 \times 3$ de suma nula, filtro de énfasis de altas frecuencias \textit{High-Boost}, generación de máscaras binarias mediante el método de Otsu con segmentación por componentes conexos de 8 vecinos, sobremuestreo antialiasing basado en el criterio de Nyquist y compuerta de calidad por gradiente espacial). En las fases de extracción y clasificación se formulan, entrenan y comparan experimentalmente cinco algoritmos supervisados obligatorios: K-Vecinos Más Cercanos (KNN), Árbol de Decisión (CART con entropía de Shannon), Máquina de Vectores de Soporte (SVM), Red Neuronal Artificial Densa (ANN/MLP) sobre descriptores de histogramas regionales concatenados ($\mathbb{R}^{256}$), y una Red Neuronal Convolucional (CNN) propia entrenada de extremo a extremo sobre tensores de imagen ($[0,1]^{1 \times 64 \times 64}$). Mediante un esquema de balanceo jerárquico en dos niveles sobre $1,221$ muestras de entrenamiento, la CNN alcanza el desempeño superior en validación automática ($\text{FRR}_{\text{puerta}} = 1.56\%$, $63/64$ identificaciones correctas, $0$ confusiones y $\text{FAR}_{\text{global}} = 0.00\%$ en $107$ intentos de desconocidos con umbral calibrado $\tau = 0.61$), siendo seleccionada como el clasificador activo en producción tanto en la interfaz local como en el portal independiente de reconocimiento remoto.
+\end{abstract}
+
+\textbf{Palabras clave:} Reconocimiento facial, conjunto abierto, convolución espacial, filtros de acentuado, máscaras de filtrado, detección facial YuNet, alineación por similitud 2D, redes neuronales convolucionales, calibración de umbral, control de acceso.
+
+\newpage
+\tableofcontents
+\newpage
+
+% ==============================================================================
+\section{Introducción y Objetivos}
+% ==============================================================================
+
+El reconocimiento facial aplicado al control de acceso físico constituye un problema de clasificación supervisada en conjunto abierto (\textit{open-set recognition}). A diferencia de un escenario académico cerrado en el que todo rostro capturado pertenece necesariamente a una de las clases inscritas, un sistema real de apertura de puerta debe resolver simultáneamente dos objetivos contrapuestos: identificar con alta sensibilidad y precisión a los usuarios autorizados (\texttt{persona\_1}, \texttt{persona\_2} y \texttt{persona\_3}) bajo variaciones naturales de pose, distancia e iluminación, y rechazar de forma estricta a cualquier individuo no registrado (\texttt{desconocido}) que intente acceder al recinto.
+
+Para abordar este problema con rigor metodológico y trazabilidad experimental, el sistema se construyó siguiendo estrictamente los fundamentos matemáticos de tratamiento digital de imágenes y aprendizaje estadístico revisados en la asignatura, integrando cinco familias de clasificadores supervisados y desplegando finalmente un portal independiente de reconocimiento remoto con procesamiento íntegro en memoria para pruebas reales desde dispositivos móviles y computadoras portátiles.
+
+\subsection{Objetivo General}
+Diseñar, implementar y validar experimentalmente en Python un sistema completo de reconocimiento facial en conjunto abierto que identifique a tres personas autorizadas y simule la apertura o cierre seguro de una puerta física en pantalla, estructurado en cuatro fases de aprendizaje automático (adquisición de datos, preprocesamiento espacial con localización facial mediante YuNet y filtrado por convolución con máscaras, extracción de características y clasificación supervisada sin etapa de postprocesamiento), seleccionando el modelo óptimo mediante comparación controlada entre cinco clasificadores (Árbol de Decisión, KNN, SVM, ANN densa y CNN) y verificando su desempeño en pruebas históricas y remotas en vivo.
+
+\subsection{Objetivos Específicos}
+\begin{enumerate}
+    \item Estructurar un protocolo estricto de adquisición y particionamiento de imágenes que aísle por completo las sesiones de entrenamiento, validación y prueba de los tres sujetos autorizados, e incorpore muestras negativas de conjunto abierto disjuntas por identidad provenientes de tres dominios: Labeled Faces in the Wild (LFW), portal web de captura externa y archivo fotográfico universitario.
+    \item Implementar una fase de preprocesamiento facial que utilice el detector YuNet exclusivamente para la ubicación espacial del rostro y de sus cinco puntos anatómicos clave, aplicando alineación geométrica de similitud 2D sin reflejo, normalización radiométrica y operadores de filtrado espacial por convolución con máscaras (filtros pasa-bajos gaussianos, filtros pasa-altos de acentuado, énfasis de altas frecuencias \textit{High-Boost}, máscaras binarias de Otsu con conectividad de 8 vecinos, sobremuestreo antialiasing de Nyquist y métricas de gradiente local).
+    \item Diseñar una fase de extracción de características que genere descriptores regionales de textura de 256 dimensiones ($4 \times 4 \times 16$) para los clasificadores vectoriales (Árbol, KNN, SVM y ANN) y aprenda representaciones jerárquicas bidimensionales hasta un espacio latente de 128 dimensiones en la Red Neuronal Convolucional (CNN).
+    \item Formular y entrenar los cinco algoritmos de clasificación bajo un esquema de balanceo jerárquico en dos niveles (normalización intra-clase por identidad desconocida y equilibrio global inter-clase al $25\%$), calibrando el umbral de decisión $\tau$ sobre la partición de validación para minimizar la tasa de falsa aceptación ($\text{FAR}$) sujeta a una tasa de falso rechazo por persona acotada ($\text{FRR}_p \le 30\%$).
+    \item Desplegar la CNN entrenada y calibrada ($\tau = 0.61$) en un portal independiente de reconocimiento remoto accesible mediante túnel HTTPS con captura desde el navegador del visitante (\texttt{getUserMedia}) y procesamiento en memoria sin almacenamiento de fotografías, diagnosticando las causas de confusión en vivo y evaluando dos fases de endurecimiento frente a oscuridad, contraluz y oclusión parcial.
+\end{enumerate}
+
+% ==============================================================================
+\section{Definición del Pipeline de Aprendizaje Automático (4 Fases)}
+% ==============================================================================
+
+El sistema implementado se rige por una arquitectura secuencial y modular de cuatro fases claramente delimitadas en el código fuente (\texttt{src/reconocimiento/}). Por requisito explícito del diseño académico, \textbf{el sistema no incluye una quinta fase de postprocesamiento}:
+
+\begin{enumerate}
+    \item \textbf{Fase 1 --- Adquisición y Obtención de Datos (\texttt{src/reconocimiento/adquisicion/}):} Captura, validación criptográfica (hashes SHA-256), registro en manifiestos CSV con control de consentimiento informado, revisión humana de cajas delimitadoras para entrenamiento y particionamiento estricto sin fuga de datos (\textit{data leakage}) entre entrenamiento, validación y prueba.
+    \item \textbf{Fase 2 --- Preprocesamiento de Imagen (\texttt{src/reconocimiento/preprocesamiento/}):} Ubicación del rostro y detección de cinco puntos faciales mediante YuNet, alineación geométrica por transformación de similitud 2D a $64 \times 64$ píxeles, conversión a escala de grises, normalización de intensidades a \texttt{float32} en $[0.0, 1.0]$, filtrado espacial mediante convolución con máscaras (suavizado gaussiano $\sigma = 0.5$, operadores de acentuado pasa-altos / \textit{High-Boost}, binarización de Otsu y conectividad de 8 vecinos) y evaluación opcional de calidad radiométrica y de gradiente.
+    \item \textbf{Fase 3 --- Extracción de Características (\texttt{src/reconocimiento/caracteristicas/} y bloques convolucionales):} Transformación del rostro preprocesado de $64 \times 64$ en un vector de histogramas regionales concatenados $\mathbf{x} \in \mathbb{R}^{256}$ normalizado en norma $L_2$ para los modelos clásicos y ANN, o extracción jerárquica mediante tres etapas de convolución 2D, normalización por lotes, activación ReLU y agrupación por máximo (\textit{MaxPooling}) hasta el vector latente $\mathbf{f}_{\text{lat}} \in \mathbb{R}^{128}$ en la CNN.
+    \item \textbf{Fase 4 --- Clasificación y Regla de Decisión de Acceso (\texttt{src/reconocimiento/clasificacion/}):} Inferencia de probabilidades a posteriori $\mathbf{p} \in [0,1]^4$ sobre las cuatro clases (\texttt{persona\_1}, \texttt{persona\_2}, \texttt{persona\_3}, \texttt{desconocido}) y evaluación inmediata de la regla canónica de control de acceso sobre el fotograma actual.
+\end{enumerate}
+
+\subsection{Exclusión Explícita de la Fase de Postprocesamiento}
+En los sistemas de visión por computador tradicionales, una quinta etapa de postprocesamiento suele añadir filtros temporales entre múltiples fotogramas, votaciones de mayoría sobre ventanas deslizantes, re-escalados heurísticos de puntuaciones o morfología posterior a la decisión. En este proyecto \textbf{se excluye formalmente la fase de postprocesamiento}. La decisión de apertura (\texttt{ABIERTA}) o bloqueo (\texttt{CERRADA}) de la puerta simulada es una función determinista pura de la salida producida por la Fase 4 sobre el fotograma evaluado:
+\begin{equation}
+\text{Puerta}(\mathbf{X}) = \begin{cases}
+\texttt{ABIERTA}, & \text{si } \text{Estado}_{\text{YuNet}}(\mathbf{X}) = \texttt{UN\_ROSTRO} \;\wedge\; \hat{p} \ge \tau \\
+ & \quad \wedge\; \hat{c} \in \{\texttt{persona\_1}, \texttt{persona\_2}, \texttt{persona\_3}\}, \\
+\texttt{CERRADA}, & \text{en cualquier otro caso},
+\end{cases}
+\label{eq:regla_acceso_determinista}
+\end{equation}
+donde $\hat{c} = \arg\max_{c} P(y = c \mid \mathbf{X})$ es la clase predicha por la CNN entrenada, $\hat{p} = \max_{c} P(y = c \mid \mathbf{X})$ es la confianza Softmax asociada y $\tau$ es el umbral congelado en validación.
+
+\subsection{Separación Funcional entre Ubicación Facial (YuNet) y Reconocimiento (CNN Entrenada)}
+Un principio arquitectónico fundamental del proyecto es la distinción estricta entre \textbf{detección facial} y \textbf{reconocimiento facial}:
+\begin{itemize}
+    \item \textbf{Rol exclusivo de YuNet (Ubicación Espacial):} El detector preentrenado YuNet (\texttt{face\_detection\_yunet\_2023mar.onnx}) opera únicamente en la Fase 2 para determinar si en el fotograma existe cero (\texttt{SIN\_ROSTRO}), uno (\texttt{UN\_ROSTRO}) o múltiples rostros (\texttt{VARIOS\_ROSTROS}), devolviendo las coordenadas espaciales del recuadro delimitador $(x, y, w, h)$ y los cinco puntos anatómicos $(\mathbf{p}_0, \dots, \mathbf{p}_4)$. YuNet carece por completo de conocimiento sobre quiénes son las personas autorizadas y \textbf{no realiza identificación ni reconocimiento en ninguna parte del sistema}.
+    \item \textbf{Rol exclusivo de la CNN Entrenada (Reconocimiento de Identidad):} Una vez ubicado y alineado el rostro a $64 \times 64$ píxeles, el reconocimiento biométrico de la identidad se ejecuta siempre mediante el clasificador supervisado entrenado específicamente con los datos del proyecto. En producción (tanto en la interfaz web local como en el portal remoto), el reconocimiento es ejecutado de manera exclusiva por la \textbf{Red Neuronal Convolucional (CNN) de cuatro clases entrenada por el equipo}.
+\end{itemize}
+
+% ==============================================================================
+\section{Fase 1 del Pipeline: Adquisición, Obtención de Datos y Particionamiento}
+% ==============================================================================
+
+\subsection{Ensayo Preliminar Cerrado y Transición a Conjunto Abierto}
+El desarrollo inició con una validación de los cinco algoritmos sobre el conjunto público estándar \textit{Olivetti Faces (AT\&T/ORL)}, compuesto por $400$ imágenes en escala de grises de $64 \times 64$ píxeles correspondientes a $40$ identidades ($10$ fotografías por persona). Si bien dicho ensayo permitió verificar la implementación matemática de las cuatro fases en un problema cerrado de $C = 40$ clases, un clasificador entrenado únicamente con clases autorizadas ($C = 3$) asigna forzosamente cualquier rostro desconocido a una de las tres personas inscritas ($\sum_{c=1}^3 P(y=c \mid \mathbf{X}) = 1$). Por ello, el sistema definitivo se formuló como un problema de $C = 4$ clases explícitas:
+\begin{equation}
+\mathcal{Y} = \{0: \texttt{persona\_1},\; 1: \texttt{persona\_2},\; 2: \texttt{persona\_3},\; 3: \texttt{desconocido}\}.
+\end{equation}
+
+\subsection{Protocolo de Sesiones de los Sujetos Autorizados}
+Para garantizar que la evaluación mida generalización real entre sesiones de captura independientes y no memorización de fondos o condiciones lumínicas idénticas, las fotografías propias de los tres usuarios autorizados se adquirieron bajo cinco poses sistemáticas (\texttt{frontal}, \texttt{izquierda}, \texttt{derecha}, \texttt{arriba} y \texttt{abajo}) y se aislaron por sesión:
+\begin{itemize}
+    \item \textbf{Partición de Entrenamiento ($268$ originales $\to 804$ muestras con aumentos):} Comprende las sesiones \texttt{sesion\_01}, \texttt{sesion\_02} y \texttt{sesion\_03} de los tres sujetos ($208$ imágenes), más tres sesiones complementarias por distancia (\texttt{sesion\_cercana}, \texttt{sesion\_media} y \texttt{sesion\_lejana}, con $60$ imágenes adicionales) capturadas para \texttt{persona\_1}. La composición original es de $148$ imágenes para \texttt{persona\_1}, $60$ para \texttt{persona\_2} y $60$ para \texttt{persona\_3}. Cada imagen original de entrenamiento genera dos variantes aumentadas deterministas (rotación planar suave, traslación subpíxel, ajuste de brillo/contraste y ruido gaussiano leve), totalizando $804$ muestras autorizadas de entrenamiento.
+    \item \textbf{Partición de Validación / Desarrollo ($64$ originales, $0$ aumentos):} Corresponde íntegramente a la \texttt{sesion\_04} ($24$ de \texttt{persona\_1}, $20$ de \texttt{persona\_2} y $20$ de \texttt{persona\_3}). Se utiliza para seleccionar hiperparámetros y calibrar el umbral de rechazo $\tau$.
+    \item \textbf{Partición de Prueba Histórica Reservada ($63$ originales, $0$ aumentos):} Corresponde a la \texttt{sesion\_05} ($22$ de \texttt{persona\_1}, $21$ de \texttt{persona\_2} y $20$ de \texttt{persona\_3}), reservada estrictamente para evaluación final sin intervenir en el entrenamiento ni en la selección de umbrales.
+\end{itemize}
+
+\subsection{Fuentes de Sujetos Desconocidos y Aislamiento por Identidad}
+Para modelar la clase \texttt{desconocido} con diversidad demográfica, óptica y geométrica, se integraron tres fuentes disjuntas por identidad:
+\begin{enumerate}
+    \item \textbf{Labeled Faces in the Wild (LFW):} Se seleccionaron identidades con separación estricta entre particiones: $300$ identidades únicas ($1$ imagen por persona) para entrenamiento, $100$ identidades para validación/calibración de umbral y $100$ identidades adicionales como reserva histórica.
+    \item \textbf{Portal Web de Captura Externa ($75$ imágenes de $5$ voluntarios):} Se desarrolló un portal de recopilación independiente donde cinco voluntarios externos reales (\texttt{david}, \texttt{externo\_piloto}, \texttt{paul}, \texttt{sonia} y \texttt{stevenl}) capturaron $15$ fotografías cada uno combinando las $5$ poses con $3$ distancias (\texttt{cercana}, \texttt{media} y \texttt{lejana}) desde sus propios dispositivos. De las $75$ fotografías, YuNet localizó un rostro válido en $72$ imágenes, las cuales se incorporaron al entrenamiento de la iteración de cobertura completa. Las $3$ imágenes restantes de \texttt{externo\_piloto} (\texttt{abajo\_cercana}, \texttt{arriba\_media} y \texttt{derecha\_lejana}) presentaron fallo de detección y se excluyeron limpiamente sin inventar recortes manuales.
+    \item \textbf{Archivo Fotográfico Universitario ($34$ imágenes de alta resolución):} Conjunto de $34$ fotografías PNG únicas de estudiantes universitarios (con permiso declarado y una persona por imagen), particionado de forma determinista (semilla $20261120$) en $18$ identidades de entrenamiento, $7$ de validación y $9$ de prueba reservada independiente. En las $18$ de entrenamiento, YuNet detectó $15$ rostros válidos (a cada uno se le aplicaron $2$ aumentos para compensar su menor volumen frente a LFW, aportando $45$ muestras) y omitió $3$ por fallo de detección.
+\end{enumerate}
+
+En la Tabla~\ref{tab:composicion_entrenamiento_pesos} se detalla el inventario exacto de las $1,221$ muestras válidas que conforman el conjunto de entrenamiento consolidado.
+
+\begin{table}[htbp]
+\centering
+\caption{Composición del conjunto de entrenamiento (1,221 muestras válidas) y distribución de pesos efectivos por fuente, clase e identidad bajo la estrategia de balance en dos niveles.}
+\label{tab:composicion_entrenamiento_pesos}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrrrr}
+\toprule
+Clase & Fuente & Orig. & Aum. & Total & Ident. & Peso total & Peso / muestra & Peso / ident. \\
+\midrule
+\texttt{persona\_1} & Autorizado \texttt{persona\_1} & 148 & 296 & 444 & 1 & 305.2500 & 0.6875 & 305.2500 \\
+\texttt{persona\_2} & Autorizado \texttt{persona\_2} & 60 & 120 & 180 & 1 & 305.2500 & 1.6958 & 305.2500 \\
+\texttt{persona\_3} & Autorizado \texttt{persona\_3} & 60 & 120 & 180 & 1 & 305.2500 & 1.6958 & 305.2500 \\
+\midrule
+\texttt{desconocido} & LFW entrenamiento & 300 & 0 & 300 & 300 & 286.1718 & 0.9539 & 0.9539 \\
+\texttt{desconocido} & Portal web (72/75 válidas) & 72 & 0 & 72 & 5 & 4.7695 & 0.0662 & 0.9539 \\
+\texttt{desconocido} & Universidad (15/18 válidas) & 15 & 30 & 45 & 15 & 14.3086 & 0.3180 & 0.9539 \\
+\midrule
+\multicolumn{2}{l}{Subtotal clase \texttt{desconocido} (25.00\%)} & 387 & 30 & 417 & 320 & 305.2500 & --- & --- \\
+\multicolumn{2}{l}{\textbf{Total entrenamiento (100.00\%)}} & \textbf{655} & \textbf{566} & \textbf{1,221} & \textbf{323} & \textbf{1,221.0000} & --- & --- \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+% ==============================================================================
+\section{Fase 2 del Pipeline: Preprocesamiento Espacial, Convoluciones, Máscaras, Filtros de Acentuado y Alineación Facial}
+% ==============================================================================
+
+\subsection{Ubicación Facial Multi-orientación con YuNet y Alineación de Similitud 2D}
+Las fotografías provenientes de cámaras móviles y archivos externos suelen presentar rotaciones de captura de $90^\circ, 180^\circ$ o $270^\circ$ respecto al eje vertical, además de inclinaciones del rostro en el plano (\textit{roll}). Para resolverlo sin confundir rotación de cámara con perfiles anatómicos, el módulo \texttt{DetectorYuNet} evalúa el modelo ONNX (\texttt{score\_threshold} $= 0.6$, \texttt{nms\_threshold} $= 0.3$) bajo una estrategia en cascada sobre las cuatro orientaciones ortogonales $\{0^\circ, 90^\circ, 270^\circ, 180^\circ\}$. Si a $0^\circ$ se localiza un rostro con confianza $\ge 0.72$, se acepta directamente; en caso contrario, se exploran las rotaciones restantes, se proyectan las coordenadas detectadas de vuelta al sistema de referencia del fotograma original y se fusionan detecciones redundantes mediante el criterio de solapamiento $\max(\text{IoU}, \text{IoMin}) \ge 0.45$.
+
+Cuando YuNet reporta exactamente \texttt{UN\_ROSTRO}, entrega el recuadro delimitador y cinco puntos anatómicos faciales $\mathcal{P} = \{\mathbf{p}_i\}_{i=0}^4 \subset \mathbb{R}^2$ (ojo derecho, ojo izquierdo, punta de la nariz, comisura labial derecha y comisura labial izquierda). Exigiendo una distancia interpupilar mínima $\|\mathbf{p}_1 - \mathbf{p}_0\|_2 \ge 4.0\;\text{px}$, dichos puntos se alinean hacia la plantilla canónica fija $\mathcal{Q} = \{\mathbf{q}_i\}_{i=0}^4$ definida en la resolución $64 \times 64$:
+\begin{equation}
+\mathcal{Q} = \begin{bmatrix} \mathbf{q}_0^\top \\ \mathbf{q}_1^\top \\ \mathbf{q}_2^\top \\ \mathbf{q}_3^\top \\ \mathbf{q}_4^\top \end{bmatrix}
+= \begin{bmatrix}
+21.0 & 24.0 \\
+43.0 & 24.0 \\
+32.0 & 36.0 \\
+23.5 & 48.0 \\
+40.5 & 48.0
+\end{bmatrix}\;\text{px}.
+\label{eq:plantilla_canonica}
+\end{equation}
+Se estima entonces una transformación afín parcial de similitud 2D de $4$ grados de libertad (escala uniforme $s$, rotación $\theta$ y traslación $(t_x, t_y)$) mediante \texttt{cv2.estimateAffinePartial2D}:
+\begin{equation}
+\begin{bmatrix} x' \\ y' \end{bmatrix}
+= M \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}
+= \begin{bmatrix} a & -b & t_x \\ b & a & t_y \end{bmatrix} \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}
+= \begin{bmatrix} s\cos\theta & -s\sin\theta & t_x \\ s\sin\theta & s\cos\theta & t_y \end{bmatrix} \begin{bmatrix} x \\ y \\ 1 \end{bmatrix},
+\label{eq:similitud_2d}
+\end{equation}
+donde $s = \sqrt{a^2 + b^2}$ y $\theta = \operatorname{atan2}(b, a)$. Se verifica estrictamente que el determinante de la submatriz lineal sea positivo para impedir reflejos especulares:
+\begin{equation}
+\det(M_{1:2,1:2}) = a^2 + b^2 = s^2 > 10^{-6}, \qquad 10^{-4} < s \le 100.0.
+\label{eq:restriccion_determinante}
+\end{equation}
+En entrenamiento, si una muestra autorizada carece de puntos faciales pero dispone de una caja aprobada en la revisión manual, no se inventan puntos artificiales: se documenta y aplica el respaldo de recorte por caja delimitadora, manteniendo trazabilidad completa.
+
+\subsection{Filtrado Espacial Discreto 2D mediante Convolución con Máscaras}
+Una vez obtenido el recorte facial de $64 \times 64$ píxeles y convertido a luminancia en escala de grises normalizada en $[0.0, 1.0]$ (\texttt{float32}), el preprocesamiento aplica técnicas de filtrado en el dominio espacial. Formalmente, un filtro espacial opera sobre la vecindad de cada píxel $(x,y)$ de la imagen $f(x,y) \in \mathbb{R}^{H \times W}$ mediante una máscara (o núcleo de convolución) $w(s,t)$ de dimensiones impares $(2a+1) \times (2b+1)$. La operación de convolución espacial discreta bidimensional está dada por:
+\begin{equation}
+g(x, y) = \frac{1}{Z} \sum_{s=-a}^{a} \sum_{t=-b}^{b} w(s, t)\, f(x + s, y + t),
+\label{eq:convolucion_espacial}
+\end{equation}
+donde $g(x,y)$ es la respuesta filtrada y $Z$ es la constante de normalización ($Z = \sum_{s,t} w(s,t)$ en filtros pasa-bajos para conservar el nivel medio de luminancia, y $Z = 1$ en máscaras diferenciales o de acentuado cuya suma de coeficientes es cero).
+
+\subsection{Filtro Gaussiano Pasa-Bajos, Teorema de Nyquist y Sobremuestreo Antialiasing}
+Con el fin de suprimir ruido electrónico de alta frecuencia e imperfecciones de cuantización antes de extraer características, el sistema aplica un filtro pasa-bajos gaussiano bidimensional (\texttt{src/reconocimiento/preprocesamiento/filtros.py}). Conforme al material teórico de la asignatura, la función continua de transformación gaussiana de media cero es:
+\begin{equation}
+T(x, y) = \exp\!\left(-\frac{x^2 + y^2}{2\pi\sigma^2}\right),
+\label{eq:gauss_teorica}
+\end{equation}
+y su núcleo discreto isotrópico normalizado se expresa como:
+\begin{equation}
+G_\sigma(s, t) = \frac{1}{Z_\sigma} \exp\!\left(-\frac{s^2 + t^2}{2\sigma^2}\right), \qquad Z_\sigma = \sum_{s=-r}^{r}\sum_{t=-r}^{r} \exp\!\left(-\frac{s^2 + t^2}{2\sigma^2}\right).
+\label{eq:gauss_discreta}
+\end{equation}
+El tamaño de la máscara cuadrada $(k_{\text{g}} \times k_{\text{g}})$ se calcula para cubrir al menos $3\sigma$ a cada lado del centro:
+\begin{equation}
+k_{\text{g}} = \max\!\left(3,\; 2\lceil 3\sigma \rceil + 1\right).
+\label{eq:tamano_kernel_gauss}
+\end{equation}
+Para el valor canónico $\sigma = 0.5$ empleado en el pipeline, resulta $\lceil 1.5 \rceil = 2$ y una máscara efectiva de $5 \times 5$ píxeles con manejo de bordes \texttt{cv2.BORDER\_REFLECT\_101}.
+
+Asimismo, el módulo implementa y verifica el análisis espectral de submuestreo bajo el teorema de Nyquist-Shannon. Al reducir la resolución espacial por un factor $S > 1$, la frecuencia de corte de Nyquist desciende de $f_{\text{Nyq}} = 0.5\;\text{ciclos/píxel}$ a:
+\begin{equation}
+f_{\text{Nyq}}^{(S)} = \frac{f_s / S}{2} = \frac{1}{2S}\;\text{ciclos/píxel}.
+\label{eq:nyquist_submuestreo}
+\end{equation}
+Toda energía espectral superior a $1/(2S)$ sufre plegamiento (\textit{aliasing}) hacia bajas frecuencias. Dado que en OpenCV \texttt{cv2.warpAffine} con la bandera \texttt{INTER\_AREA} equivale internamente a interpolación bilineal y no ejecuta integración por área real cuando se reducen rostros de alta resolución (por ejemplo, imágenes universitarias de $2048 \times 2048$ hacia $64 \times 64$ con $s \ll 0.9$), se implementó también una variante explícita y versionada de remuestreo antialiasing (\texttt{supersampling\_area}). Cuando $s < 0.9$, esta variante calcula el factor de sobremuestreo entero:
+\begin{equation}
+k = \operatorname{clamp}\!\left(\operatorname{round}\!\left(\frac{1}{s}\right),\, 2,\, 16\right),
+\label{eq:factor_sobremuestreo}
+\end{equation}
+proyecta la imagen afínmente hacia un lienzo intermedio de $(64k \times 64k)$ píxeles con compensación de centrado subpíxel $(k-1)/2$:
+\begin{equation}
+M_{\text{sup}} = \begin{bmatrix} k\,M_{1,1} & k\,M_{1,2} & k\,M_{1,3} + \frac{k-1}{2} \\ k\,M_{2,1} & k\,M_{2,2} & k\,M_{2,3} + \frac{k-1}{2} \end{bmatrix},
+\label{eq:matriz_sobremuestreo}
+\end{equation}
+y reduce finalmente a $64 \times 64$ mediante \texttt{cv2.resize(..., INTER\_AREA)}. En la prueba sobre un patrón sintético de alta frecuencia ($512 \times 512 \to 64 \times 64$), este procedimiento redujo la desviación estándar residual de aliasing de $104.14$ a $3.21$ ($96.92\%$ de reducción sobre el patrón sintético de prueba).
+
+\subsection{Filtros Espaciales de Acentuado (Pasa-Altos), Énfasis de Altas Frecuencias y Gradiente Local}
+Como contraparte de las máscaras pasa-bajos de suavizado, en la fundamentación y análisis del preprocesamiento se estudiaron y aplicaron operadores espaciales de acentuado (pasa-altos), cuyo propósito es realzar transiciones abruptas de intensidad, bordes anatómicos (contornos oculares, cejas, tabique nasal y comisuras labiales) y medir el nivel de detalle local. La máscara espacial pasa-altos isotrópica de $3 \times 3$ con suma de coeficientes nula ($\sum_{s,t} w(s,t) = 0$) se define como:
+\begin{equation}
+W_{\text{PA}} = \begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}.
+\label{eq:mascara_pa}
+\end{equation}
+Al convolucionar $W_{\text{PA}}$ con la imagen, cualquier región de intensidad constante produce una respuesta nula, mientras que los cambios bruscos de luminancia son amplificados sustractivamente respecto a sus ocho vecinos:
+\begin{equation}
+PA(x,y) = f(x,y) - PB(x,y),
+\label{eq:sustraccion_pa}
+\end{equation}
+donde $PB(x,y)$ representa la componente suavizada pasa-bajos. En el inspector visual de preprocesamiento de cuatro fases de la aplicación web (\texttt{inspector\_pipeline.py}), este residuo de alta frecuencia $|f(x,y) - G_{\sigma}*f(x,y)|$ se calcula y visualiza amplificado ($\times 8$) para inspeccionar en tiempo real los contornos faciales retenidos o atenuados por el filtrado espacial.
+
+Asimismo, cuando se requiere acentuar las altas frecuencias sin perder la estructura tonal de baja frecuencia del rostro, se define el filtro de énfasis de altas frecuencias (\textit{High-Boost}) con constante de amplificación $A > 1$:
+\begin{equation}
+EA(x,y) = A\,f(x,y) - PB(x,y) = (A - 1)\,f(x,y) + PA(x,y),
+\label{eq:high_boost}
+\end{equation}
+cuya máscara de convolución equivalente de $3 \times 3$ adopta el coeficiente central $9A - 1$:
+\begin{equation}
+W_{\text{HB}}(A) = \begin{bmatrix} -1 & -1 & -1 \\ -1 & 9A - 1 & -1 \\ -1 & -1 & -1 \end{bmatrix}, \qquad \sum_{s,t} W_{\text{HB}}(s,t) = 9(A - 1).
+\label{eq:mascara_high_boost}
+\end{equation}
+
+De forma directa en el pipeline de admisión (Fase 1 de robustez, \path{src/reconocimiento/preprocesamiento/calidad.py}), la respuesta pasa-altos de primer orden (gradiente espacial discreto $L_1$) se evalúa sobre el tercio inferior del rostro alineado $I_{\text{inf}} = I[42:63, 0:63]$ junto con la luminancia media $\mu_I$, el contraste $\sigma_I$ y la fracción de píxeles oscuros $f_{\text{osc}}$ para detectar oscuridad severa u oclusión de boca y mentón antes de consultar a la CNN:
+\begin{align}
+\mu_I &= \frac{1}{64^2} \sum_{y=0}^{63} \sum_{x=0}^{63} I(y,x), \qquad
+\sigma_I = \sqrt{\frac{1}{64^2} \sum_{y=0}^{63} \sum_{x=0}^{63} \bigl(I(y,x) - \mu_I\bigr)^2}, \\
+f_{\text{osc}} &= \frac{1}{22 \cdot 64} \sum_{y=42}^{63} \sum_{x=0}^{63} \mathbb{I}\bigl(I(y,x) < 15.0\bigr), \\
+G_{\text{inf}} &= \frac{1}{22 \cdot 63} \sum_{y=42}^{63} \sum_{x=0}^{62} \bigl|I(y, x+1) - I(y, x)\bigr|
++ \frac{1}{21 \cdot 64} \sum_{y=42}^{62} \sum_{x=0}^{63} \bigl|I(y+1, x) - I(y, x)\bigr|.
+\label{eq:metricas_calidad}
+\end{align}
+
+\subsection{Máscaras Binarias por Método de Otsu y Conectividad de 8 Vecinos}
+El módulo \texttt{src/reconocimiento/preprocesamiento/mascara.py} implementa la generación de máscaras faciales binarias y la segmentación topológica por componentes conexos. El umbral óptimo $t^* \in \{0,\dots,255\}$ de Otsu se obtiene maximizando la varianza inter-clase $\sigma_b^2(t)$ sobre el histograma normalizado:
+\begin{equation}
+t^* = \arg\max_{t \in \{0,\dots,255\}} \omega_0(t)\omega_1(t)\bigl[\mu_0(t) - \mu_1(t)\bigr]^2,
+\label{eq:otsu}
+\end{equation}
+generando la máscara $B(x,y) = 255\,\mathbb{I}(I(x,y) > t^*)$. Para aislar la región facial principal y descartar artefactos periféricos, se etiquetan los componentes conexos mediante vecindad de 8 vecinos $N_8(x,y) = \{(x+\Delta x, y+\Delta y) : \Delta x, \Delta y \in \{-1,0,1\}\} \setminus \{(x,y)\}$, seleccionando el componente $c^* = \arg\max_{c \ge 1} |C_c|$. La superioridad de la conectividad 8 frente a la conectividad 4 para preservar contornos diagonales se verifica analítica y experimentalmente sobre la matriz sintética diagonal $M = \bigl[\begin{smallmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 0 \end{smallmatrix}\bigr]$, donde $N_4$ fragmenta la estructura en $2$ componentes desconectados mientras que $N_8$ la preserva como $1$ único componente conexo.
+
+% ==============================================================================
+\section{Fase 3 del Pipeline: Extracción de Características}
+% ==============================================================================
+
+El diseño del sistema respeta la naturaleza matemática de cada familia de clasificadores evitando imponer una representación única inadecuada:
+
+\subsection{Descriptores Regionales de Textura (\texorpdfstring{$4 \times 4 \times 16 = 256$}{4 x 4 x 16 = 256} Dimensiones)}
+Para los cuatro clasificadores que operan sobre espacios vectoriales de atributos (Árbol de Decisión, KNN, SVM y ANN densa), el módulo \texttt{ExtractorHistogramasRegionales} divide la imagen preprocesada $I \in [0,1]^{64 \times 64}$ en una cuadrícula regular de $4 \times 4 = 16$ subregiones espaciales $R_{r_y, r_x}$ de $16 \times 16$ píxeles cada una. De este modo se preserva la localización espacial de las estructuras anatómicas (ojos en las filas superiores, nariz en la zona central y boca/mentón en las filas inferiores). En cada subregión $r \in \{1,\dots,16\}$ se cuantifica la distribución de intensidades en $B = 16$ intervalos uniformes (\textit{bins}) sobre $[0.0, 1.0]$:
+\begin{equation}
+h_{r,b} = \frac{c_{r,b}}{\sum_{j=0}^{15} c_{r,j}}, \qquad \mathbf{x}_{\text{raw}} = \bigoplus_{r=1}^{16} \mathbf{h}_r \in \mathbb{R}^{256}, \qquad \mathbf{x} = \frac{\mathbf{x}_{\text{raw}}}{\max(\|\mathbf{x}_{\text{raw}}\|_2, 10^{-8})} \in \mathbb{R}^{256}.
+\label{eq:vector_histogramas}
+\end{equation}
+
+\subsection{Aprendizaje Jerárquico de Características Convolucionales en la CNN}
+En la Red Neuronal Convolucional (\texttt{ClasificadorCNN}), la extracción de características se aprende de extremo a extremo directamente sobre la topología bidimensional del rostro $\mathbf{X} \in [0,1]^{1 \times 64 \times 64}$ mediante tres bancos sucesivos de filtros de convolución de $3 \times 3$ con relleno (\textit{padding}) de $1$ píxel, normalización por lotes (\texttt{BatchNorm2d}), activación no lineal $\operatorname{ReLU}(u) = \max(0, u)$ y reducción espacial $\operatorname{MaxPool}_{2 \times 2}$:
+\begin{itemize}
+    \item \textbf{Bloque Convolucional 1 ($1 \to 16$ mapas de $32 \times 32$):} Aprende $16$ máscaras de convolución de $3 \times 3$ que actúan como detectores direccionales de bordes, gradientes de acentuado y contrastes locales primarios.
+    \item \textbf{Bloque Convolucional 2 ($16 \to 32$ mapas de $16 \times 16$):} Combina los bordes primarios para capturar motivos faciales de escala intermedia (arcos ciliares, cuencas oculares, aletas nasales y pliegues labiales).
+    \item \textbf{Bloque Convolucional 3 ($32 \to 64$ mapas de $8 \times 8$):} Sintetiza configuraciones estructurales de alto nivel ($64 \times 8 \times 8 = 4096$ unidades), las cuales se proyectan mediante la capa densa $\mathbf{W}_{\text{fc1}} \in \mathbb{R}^{128 \times 4096}$ y activación ReLU hacia el vector de características latentes (\textit{embedding}) $\mathbf{f}_{\text{lat}} \in \mathbb{R}^{128}$.
+\end{itemize}
+
+% ==============================================================================
+\section{Fase 4 del Pipeline: Clasificación Supervisada, Balance en Dos Niveles y Regla de Decisión}
+% ==============================================================================
+
+\subsection{Formulación Matemática de los Cinco Clasificadores Comparados}
+Sea $C = 4$ el número de clases del sistema de control de acceso:
+\begin{enumerate}
+    \item \textbf{K-Vecinos Más Cercanos (KNN):} Dado un vector de consulta $\mathbf{x} \in \mathbb{R}^{256}$, determina el conjunto $\mathcal{N}_K(\mathbf{x})$ de los $K$ ejemplos de entrenamiento más próximos bajo la métrica seleccionada en validación ($d(\mathbf{x}, \mathbf{x}_j)$: Euclidiana $L_2$, Manhattan $L_1$ o Coseno) y estima la probabilidad posterior:
+    \begin{equation}
+    P(y = c \mid \mathbf{x}) = \frac{\sum_{j \in \mathcal{N}_K(\mathbf{x})} \alpha_j \, \mathbb{I}(y_j = c)}{\sum_{j \in \mathcal{N}_K(\mathbf{x})} \alpha_j},
+    \label{eq:knn}
+    \end{equation}
+    donde $\alpha_j = d(\mathbf{x}, \mathbf{x}_j)^{-1}$ pondera los vecinos locales por distancia inversa.
+
+    \item \textbf{Árbol de Decisión (CART con Entropía de Shannon):} Particiona recursivamente el espacio $\mathbb{R}^{256}$ maximizando la ganancia de información ponderada por los pesos muestrales $w_i$:
+    \begin{equation}
+    H(S) = -\sum_{c=0}^{C-1} p_c(S) \log_2 p_c(S), \qquad
+    \operatorname{Gain}(S, A) = H(S) - \sum_{v} \frac{W(S_v)}{W(S)} H(S_v),
+    \label{eq:arbol_entropia}
+    \end{equation}
+    con $W(S) = \sum_{i \in S} w_i$ y $p_c(S) = \frac{1}{W(S)}\sum_{i \in S:\, y_i = c} w_i$.
+
+    \item \textbf{Máquina de Vectores de Soporte (SVM):} Previa estandarización z-score ajustada exclusivamente sobre entrenamiento ($\tilde{\mathbf{x}} = (\mathbf{x} - \boldsymbol{\mu}_{\text{train}}) \oslash \boldsymbol{\sigma}_{\text{train}}$), entrena $\binom{4}{2} = 6$ hiperplanos binarios \textit{Uno-contra-Uno} resolviendo el problema primal de margen suave ponderado:
+    \begin{equation}
+    \min_{\mathbf{w}, b, \boldsymbol{\xi}} \frac{1}{2}\|\mathbf{w}\|_2^2 + C_{\text{reg}} \sum_{i} w_i \xi_i \quad \text{s.a.} \quad y_i^{(ab)}\!\left(\langle \mathbf{w}, \phi(\tilde{\mathbf{x}}_i) \rangle + b\right) \ge 1 - \xi_i,\;\; \xi_i \ge 0,
+    \label{eq:svm_primal}
+    \end{equation}
+    con núcleo RBF $K(\tilde{\mathbf{x}}, \tilde{\mathbf{z}}) = \exp(-\gamma \|\tilde{\mathbf{x}} - \tilde{\mathbf{z}}\|_2^2)$ y estimación de probabilidades multiclase acoplada.
+
+    \item \textbf{Red Neuronal Artificial Densa (ANN / MLP):} Red de tres capas totalmente conectadas sobre $\mathbf{x} \in \mathbb{R}^{256}$ con arquitectura $256 \to 128 \to 64 \to 4$:
+    \begin{align}
+    \mathbf{h}_1 &= \operatorname{Dropout}_{0.25}\!\Big(\operatorname{ReLU}\!\big(\operatorname{BN}_{1\text{D}}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1)\big)\Big), \\
+    \mathbf{h}_2 &= \operatorname{Dropout}_{0.25}\!\Big(\operatorname{ReLU}(\mathbf{W}_2 \mathbf{h}_1 + \mathbf{b}_2)\Big), \\
+    \mathbf{z}_{\text{ANN}}(\mathbf{x}) &= \mathbf{W}_3 \mathbf{h}_2 + \mathbf{b}_3 \in \mathbb{R}^4.
+    \label{eq:arquitectura_ann}
+    \end{align}
+
+    \item \textbf{Red Neuronal Convolucional (CNN --- Modelo Activo de Reconocimiento):} Compuesta por los tres bloques convolucionales $\mathcal{B}_1, \mathcal{B}_2, \mathcal{B}_3$ seguidos del clasificador denso $4096 \to 128 \to 4$ con regularización Dropout ($p = 0.35$):
+    \begin{align}
+    \mathbf{F}_3 &= \mathcal{B}_3\bigl(\mathcal{B}_2\bigl(\mathcal{B}_1(\mathbf{X})\bigr)\bigr) \in \mathbb{R}^{64 \times 8 \times 8}, \\
+    \mathbf{f}_{\text{lat}} &= \operatorname{ReLU}\!\big(\mathbf{W}_{\text{fc1}} \operatorname{vec}(\mathbf{F}_3) + \mathbf{b}_{\text{fc1}}\big) \in \mathbb{R}^{128}, \\
+    P(y = c \mid \mathbf{X}) &= \operatorname{Softmax}\!\big(\mathbf{W}_{\text{fc2}} \operatorname{Dropout}_{0.35}(\mathbf{f}_{\text{lat}}) + \mathbf{b}_{\text{fc2}}\big)_c.
+    \label{eq:arquitectura_cnn}
+    \end{align}
+    Se entrena durante $80$ épocas con tamaño de lote $16$, optimizador Adam ($\eta = 5 \times 10^{-4}$, $\lambda = 10^{-4}$), semilla fija $42$ y selección del punto de control que maximiza el \textit{macro-recall} en validación.
+\end{enumerate}
+
+\subsection{Estrategia de Balanceo Jerárquico en Dos Niveles}
+Para evitar que la clase \texttt{persona\_1} ($444$ muestras) domine sobre \texttt{persona\_2} y \texttt{persona\_3} ($180$ muestras cada una), o que los $5$ voluntarios del portal con $15$ fotos cada uno eclipsen a las $300$ identidades de LFW con $1$ sola foto dentro de \texttt{desconocido}, se formuló el esquema de pesos muestrales $w_i$ en dos niveles:
+\begin{equation}
+w_i^{\text{id}} = \begin{cases}
+\dfrac{1}{n_{u(i)}}, & \text{si } y_i = \texttt{desconocido}, \\
+1, & \text{si } y_i \in \{\texttt{persona\_1}, \texttt{persona\_2}, \texttt{persona\_3}\},
+\end{cases}
+\qquad
+w_i = \left(\frac{N_{\text{train}} / 4}{\sum_{j:\, y_j = y_i} w_j^{\text{id}}}\right) w_i^{\text{id}}.
+\label{eq:balance_dos_niveles}
+\end{equation}
+Así, cada una de las $4$ clases recibe exactamente $305.25$ unidades de peso efectivo ($25.0\%$ del total de $1,221$), y cada una de las $320$ identidades desconocidas aporta equitativamente $305.25 / 320 = 0.9539$ unidades efectivas. En la CNN y la ANN, $w_i$ pondera directamente la pérdida de entropía cruzada por muestra sin activar \texttt{pesos\_clases} adicionales:
+\begin{equation}
+\mathcal{L}_{\text{pond}}(\theta) = -\frac{1}{|B|} \sum_{i \in B} w_i \log P_\theta(y = y_i \mid \mathbf{X}_i).
+\label{eq:perdida_ponderada}
+\end{equation}
+
+\subsection{Calibración Jerárquica del Umbral de Rechazo (Regla B)}
+Sobre la partición de validación ($64$ intentos autorizados de \texttt{sesion\_04} y $107$ intentos de desconocidos: $100$ LFW + $7$ universitarios), se explora la rejilla de umbrales $\tau \in [0.30, 0.95]$ con paso $0.01$. Un umbral $\tau$ se declara \textit{viable} si ninguna persona autorizada supera una tasa de falso rechazo del $30\%$ ($\text{FRR}_p(\tau) \le 0.30,\; \forall p \in \{1,2,3\}$). Entre los umbrales viables, la selección jerárquica prioriza estrictamente la seguridad física:
+\begin{equation}
+\tau^* = \arg\min_{\tau \;\text{viable}} \Bigl(\text{FAR}_{\text{global}}(\tau),\; \text{FRR}_{\text{puerta}}(\tau),\; -\text{Aciertos}_{\text{id}}(\tau),\; -\tau\Bigr).
+\label{eq:seleccion_jerarquica}
+\end{equation}
+
+% ==============================================================================
+\section{Resultados Experimentales y Evaluaciones Históricas}
+% ==============================================================================
+
+\subsection{Comparación de los Cinco Clasificadores en Validación Automática}
+En la Tabla~\ref{tab:comparativa_5_clasificadores_validacion} se presentan los resultados de los cinco algoritmos entrenados sobre el conjunto consolidado de $1,221$ muestras y evaluados sobre la partición de validación automática.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparación de los cinco clasificadores entrenados con cobertura completa del portal y balance en dos niveles sobre la partición de validación automática (64 intentos autorizados de Sesión 04, 100 LFW de calibración y 7 universitarios de validación).}
+\label{tab:comparativa_5_clasificadores_validacion}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+Modelo & Estado (Umbral) & Correctas (64) & Conf. & $\text{FRR}_{\text{puerta}}$ & $\text{FAR}_{\text{global}}$ (107) & $\text{FAR}_{\text{LFW}}$ (100) & $\text{FAR}_{\text{Univ}}$ (7) \\
+\midrule
+Árbol & Sin umbral viable (Regla A) & 26 & 24 & 21.88\% (14/64) & 8.41\% (9/107) & 9.00\% (9/100) & 0.00\% (0/7) \\
+KNN & Viable (0.58) & 44 & 11 & 14.06\% (9/64) & 1.87\% (2/107) & 2.00\% (2/100) & 0.00\% (0/7) \\
+SVM & Viable (0.41) & 44 & 8 & 18.75\% (12/64) & 3.74\% (4/107) & 3.00\% (3/100) & 14.29\% (1/7) \\
+ANN & Viable (0.92) & 52 & 1 & 17.19\% (11/64) & 2.80\% (3/107) & 2.00\% (2/100) & 14.29\% (1/7) \\
+\textbf{CNN} & \textbf{Viable (0.61)} & \textbf{63} & \textbf{0} & \textbf{1.56\% (1/64)} & \textbf{0.00\% (0/107)} & \textbf{0.00\% (0/100)} & \textbf{0.00\% (0/7)} \\
+\midrule
+Ref. \texttt{univ\_v1\_cnn} & Propuesta anterior (0.50) & 63 & 0 & 1.56\% (1/64) & 0.00\% (0/107) & 0.00\% (0/100) & 0.00\% (0/7) \\
+Ref. \texttt{anterior\_cnn\_alineado} & Congelado (0.84) & 63 & 0 & 1.56\% (1/64) & 0.00\% (0/107) & 0.00\% (0/100) & 0.00\% (0/7) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+Los resultados demuestran de forma concluyente la superioridad de la \textbf{Red Neuronal Convolucional (CNN)} sobre los cuatro modelos basados en histogramas regionales:
+\begin{itemize}
+    \item El \textbf{Árbol de Decisión} fragmenta ortogonalmente los $256$ contenedores de histograma y no logra hallar ningún umbral viable que satisfaga simultáneamente $\text{FRR}_p \le 30\%$, incurriendo en $24$ confusiones entre autorizados y $9/107$ falsas aceptaciones en Regla A.
+    \item \textbf{KNN} ($\tau = 0.58$), \textbf{SVM} ($\tau = 0.41$) y \textbf{ANN densa} ($\tau = 0.92$) alcanzan umbrales viables, pero los histogramas regionales pierden relaciones geométricas finas entre subregiones, dejando tasas de falso rechazo de puerta entre $14.06\%$ y $18.75\%$ y tasas de falsa aceptación entre $1.87\%$ y $3.74\%$.
+    \item La \textbf{CNN Estándar Portal Completo} ($\tau = 0.61$) logra \textbf{$63/64$ identificaciones correctas ($98.44\%$)}, \textbf{$0$ confusiones entre autorizados}, un único bloqueo ($\text{FRR}_{\text{puerta}} = 1.56\%$) y \textbf{$0/107$ falsas aceptaciones ($\text{FAR} = 0.00\%$)}, donde los $107$ intentos desconocidos se desglosan en $91$ rechazos explícitos por el clasificador ($86$ LFW y $5$ universitarios) y $16$ bloqueos por fallo de detección de YuNet ($14$ LFW y $2$ universitarios).
+\end{itemize}
+
+\subsection{Evaluación Comparativa en la Prueba Histórica Sesión 05 (63 Intentos Autorizados)}
+Una vez congeladas tanto la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)} como la variante experimental \textbf{CNN Antialiasing ($\tau = 0.52$)} ---la cual empató exactamente en validación automática con $63/64$ aciertos y $0/107$ FAR---, ambas se evaluaron sobre la partición de prueba histórica \texttt{sesion\_05} ($63$ intentos de sujetos autorizados; esta partición evalúa exclusivamente usuarios autorizados y por tanto no mide $\text{FAR}$ de desconocidos). Las Tablas~\ref{tab:sesion05_comparativa_pareada} y~\ref{tab:sesion05_poses_y_confusion} resumen el desempeño global, por persona, por pose y emparejado.
+
+\begin{table}[htbp]
+\centering
+\caption{Evaluación comparativa global, por persona y emparejada en la prueba histórica Sesión 05 (63 intentos autorizados; 0 bloqueos y 0 fallos de detección en ambos modelos).}
+\label{tab:sesion05_comparativa_pareada}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Métrica / Subgrupo & \multicolumn{2}{c}{CNN Estándar (umbral 0.61)} & \multicolumn{2}{c}{CNN Antialiasing (umbral 0.52)} \\
+\midrule
+\textbf{Global (63 intentos)} & \multicolumn{2}{c}{58/63 correctas (92.06\%)} & \multicolumn{2}{c}{59/63 correctas (93.65\%)} \\
+Confusiones entre autorizados & \multicolumn{2}{c}{5} & \multicolumn{2}{c}{4} \\
+$\text{FRR}_{\text{puerta}}$ & \multicolumn{2}{c}{0.00\% (0/63)} & \multicolumn{2}{c}{0.00\% (0/63)} \\
+Latencia detección + alineación & \multicolumn{2}{c}{16.96 ms} & \multicolumn{2}{c}{17.52 ms} \\
+Latencia total media & \multicolumn{2}{c}{19.14 ms} & \multicolumn{2}{c}{19.54 ms} \\
+\midrule
+\textbf{Desglose por persona} & Correctas / Intentos & Confusiones & Correctas / Intentos & Confusiones \\
+\midrule
+\texttt{persona\_1} & 20 / 22 & 2 & 21 / 22 & 1 \\
+\texttt{persona\_2} & 18 / 21 & 3 & 18 / 21 & 3 \\
+\texttt{persona\_3} & 20 / 20 & 0 & 20 / 20 & 0 \\
+\midrule
+\textbf{Comparación pareada (63 intentos)} & \multicolumn{4}{c}{Conteo de concordancia entre modelos} \\
+\midrule
+Ambas correctas & \multicolumn{4}{c}{58 / 63} \\
+Solo Estándar correcta & \multicolumn{4}{c}{0 / 63} \\
+Solo Antialiasing correcta & \multicolumn{4}{c}{1 / 63 (\texttt{persona\_1\_sesion\_05\_izquierda\_01})} \\
+Ninguna correcta & \multicolumn{4}{c}{4 / 63 (1 en \texttt{abajo} de \texttt{persona\_1}; 3 en \texttt{derecha} de \texttt{persona\_2})} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Desglose por pose y matrices de confusión en la prueba histórica Sesión 05 (63 intentos autorizados).}
+\label{tab:sesion05_poses_y_confusion}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\multicolumn{6}{c}{\textbf{A. Desglose por pose (0 bloqueos en todas las poses)}} \\
+\midrule
+Pose & Intentos & \multicolumn{2}{c}{CNN Estándar (0.61)} & \multicolumn{2}{c}{CNN Antialiasing (0.52)} \\
+ & & Correctas & Confusiones & Correctas & Confusiones \\
+\midrule
+Frontal & 13 & 13 & 0 & 13 & 0 \\
+Izquierda & 12 & 11 & 1 & 12 & 0 \\
+Derecha & 12 & 9 & 3 & 9 & 3 \\
+Arriba & 12 & 12 & 0 & 12 & 0 \\
+Abajo & 14 & 13 & 1 & 13 & 1 \\
+\midrule
+\multicolumn{6}{c}{\textbf{B. Matrices de confusión (Real vs. Predicha)}} \\
+\midrule
+Clase real & \multicolumn{4}{c}{Predicha: Estándar (0.61) / Antialiasing (0.52)} & Total real \\
+ & \texttt{persona\_1} & \texttt{persona\_2} & \texttt{persona\_3} & \texttt{desconocido} / Bloq. & \\
+\midrule
+\texttt{persona\_1} & 20 / 21 & 2 / 1 & 0 / 0 & 0 / 0 & 22 \\
+\texttt{persona\_2} & 3 / 3 & 18 / 18 & 0 / 0 & 0 / 0 & 21 \\
+\texttt{persona\_3} & 0 / 0 & 0 / 0 & 20 / 20 & 0 / 0 & 20 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\subsection{Evaluación Independiente en la Reserva de 9 Identidades Universitarias}
+Para evaluar el comportamiento de conjunto abierto frente a fotografías de alta resolución de sujetos desconocidos nunca vistos en entrenamiento ni validación, se ejecutó una única evaluación sobre las $9$ identidades de la partición \texttt{prueba\_reservada} del archivo universitario (Tabla~\ref{tab:evaluacion_final_9_universidad}). La CNN Estándar Portal Completo ($\tau = 0.61$) rechazó explícitamente como \texttt{desconocido} a $7/9$ identidades ($77.78\%$, con puntuaciones hacia \texttt{desconocido} entre $0.9794$ y $1.0000$) y presentó $2/9$ falsas aceptaciones (\texttt{universidad\_010} y \texttt{universidad\_030}), empatando con la referencia alineada anterior ($\tau = 0.84$) pero reduciendo las puntuaciones espurias de ambos casos ($0.9890 \to 0.8487$ y $0.9815 \to 0.8410$).
+
+\begin{table}[htbp]
+\centering
+\caption{Evaluación independiente sobre la partición reservada de 9 identidades universitarias desconocidas (0 solapamiento con entrenamiento y validación).}
+\label{tab:evaluacion_final_9_universidad}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcc}
+\toprule
+Métrica & Referencia CNN (umbral 0.84) & Nueva CNN Portal Completo (umbral 0.61) \\
+\midrule
+Intentos totales evaluados & 9 & 9 \\
+Clasificados por el pipeline & 9 & 9 \\
+$\text{FAR}$ extremo a extremo & 2 / 9 (22.22\%) & 2 / 9 (22.22\%) \\
+Clasificación explícita \texttt{desconocido} & 7 (77.78\%) & 7 (77.78\%) \\
+Rechazos por umbral / Fallos YuNet & 0 / 0 & 0 / 0 \\
+Latencia media & 91.11 ms & 104.94 ms \\
+\midrule
+\multicolumn{3}{c}{\textbf{Concordancia pareada y falsas aceptaciones}} \\
+\midrule
+Ambos rechazan (\texttt{CERRADA}) & \multicolumn{2}{c}{7 / 9 (\texttt{011, 013, 018, 023, 027, 029, 032})} \\
+Ambos aceptan (\texttt{ABIERTA}) & \multicolumn{2}{c}{2 / 9 (\texttt{universidad\_010} y \texttt{universidad\_030})} \\
+\texttt{universidad\_010} (pred. \texttt{persona\_3}) & Score = 0.9890 ($\geq 0.84$) & Score = 0.8487 ($\geq 0.61$) \\
+\texttt{universidad\_030} (pred. \texttt{persona\_1}) & Score = 0.9815 ($\geq 0.84$) & Score = 0.8410 ($\geq 0.61$) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+% ==============================================================================
+\section{Despliegue del Portal Remoto, Diagnóstico del Piloto en Vivo y Mejoras de Robustez (Fases 1 y 2)}
+% ==============================================================================
+
+\subsection{Arquitectura del Portal Independiente de Reconocimiento Remoto}
+Con el objetivo de permitir pruebas multiusuario desde teléfonos móviles y computadoras portátiles sin exponer el panel administrativo local (puerto $5000$) ni las fotografías privadas del proyecto, se construyó el servicio independiente \texttt{src/reconocimiento/portal\_reconocimiento/} desplegado sobre el servidor WSGI de producción \textit{Waitress} en el puerto local $5002$ y expuesto únicamente bajo demanda mediante túnel HTTPS de Cloudflare (\texttt{cloudflared tunnel --url http://127.0.0.1:5002}):
+\begin{itemize}
+    \item \textbf{Captura en el navegador del visitante y privacidad estricta:} El cliente captura video mediante \texttt{navigator.mediaDevices.getUserMedia} (nunca \texttt{cv2.VideoCapture} del servidor), comprime fotogramas JPEG (máximo $640\;\text{px}$) a una tasa adaptativa máxima de $\sim 2\;\text{solicitudes/s}$ con control estricto de una única operación en vuelo por visitante y temporizador \texttt{AbortController} que abarca tanto cabeceras como decodificación JSON. El servidor decodifica el arreglo de bytes en memoria RAM (\texttt{cv2.imdecode}), ejecuta \texttt{PipelineCandidatoCongelado.evaluar\_fotograma\_completo} y descarta el fotograma inmediatamente sin escribir imágenes ni cadenas base64 en disco.
+    \item \textbf{Aislamiento concurrente y registro idempotente:} Los candidatos congelados se cargan una sola vez al iniciar a partir de una lista cerrada de identificadores, protegidos por cerrojos de exclusión mutua (\texttt{threading.Lock}) y un semáforo acotado de cola concurrente. Incluye además un botón de \textit{Registrar intento} con clave de idempotencia UUID que almacena únicamente metadatos estructurados en \texttt{intentos.jsonl} y recupera el registro original ante reintentos de red o reinicios del servidor sin duplicar entradas.
+\end{itemize}
+
+\subsection{Diagnóstico del Piloto Inicial con Nueve Participantes y Análisis del Espacio Latente}
+En el primer despliegue piloto participaron $9$ personas reales ($1$ usuario autorizado correspondiente a \texttt{persona\_2} y $8$ sujetos desconocidos: $3$ voluntarios cuyas fotografías previas formaban parte del conjunto de entrenamiento del portal ---\texttt{david}, \texttt{sonia} y \texttt{stevenl}---, el hermano de \texttt{persona\_1} registrado como \texttt{externo\_piloto}, y $4$ desconocidos completamente nuevos). Durante esa primera sesión, en la cual estaba seleccionado por defecto el candidato \textbf{CNN Antialiasing ($\tau = 0.52$)}, el sistema identificó sin inconvenientes a \texttt{persona\_2} y rechazó correctamente a \texttt{david}, \texttt{sonia} y a $3$ de los $4$ desconocidos nuevos; sin embargo, se observaron tres anomalías específicas:
+\begin{enumerate}
+    \item \texttt{stevenl} fue clasificado de manera persistente como \texttt{persona\_1} con confianza superior al $90\%$, a pesar de que sus $15$ fotos del portal habían sido incluidas en el entrenamiento como \texttt{desconocido}.
+    \item Un participante desconocido nuevo fue rechazado correctamente mientras permaneció frontal y quieto, pero al cubrirse parcialmente el rostro o mover el teléfono en condiciones de baja iluminación fue aceptado erróneamente como usuario autorizado.
+    \item El hermano de \texttt{persona\_1} (\texttt{externo\_piloto}), con alto parecido físico familiar, fue clasificado como \texttt{persona\_1}.
+\end{enumerate}
+
+Para determinar matemáticamente la causa de estas confusiones sin reentrenar a ciegas, se ejecutó la auditoría \texttt{scripts/diagnosticar\_confusiones\_piloto.py} evaluando ambos candidatos congelados sobre las $75$ fotografías originales del portal (Tabla~\ref{tab:diagnostico_ajuste_portal_75}), el espacio de embeddings de $128$ dimensiones en la capa \texttt{fc1\_relu} (Tabla~\ref{tab:diagnostico_embeddings_128d}) y un banco de $11$ perturbaciones físicas aplicadas sobre el fotograma completo antes de YuNet (Tabla~\ref{tab:diagnostico_11_perturbaciones}).
+
+\begin{table}[htbp]
+\centering
+\caption{Ajuste por identidad sobre las 75 fotografías originales del portal (desglose: rechazo explícito / rechazo por umbral / falsa aceptación / fallo de detección YuNet).}
+\label{tab:diagnostico_ajuste_portal_75}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+Identidad (intentos) & Antialiasing (0.52) & Estándar (0.61) & Destino FA en AA (0.52) \\
+\midrule
+\texttt{david} (15) & 15 / 0 / 0 / 0 & 15 / 0 / 0 / 0 & --- \\
+\texttt{externo\_piloto} (15) & 11 / 0 / 1 / 3 & 12 / 0 / 0 / 3 & \texttt{persona\_1}: 1 \\
+\texttt{paul} (15) & 15 / 0 / 0 / 0 & 15 / 0 / 0 / 0 & --- \\
+\texttt{sonia} (15) & 15 / 0 / 0 / 0 & 15 / 0 / 0 / 0 & --- \\
+\texttt{stevenl} (15) & 9 / 0 / 6 / 0 & 15 / 0 / 0 / 0 & \texttt{persona\_1}: 4, \texttt{persona\_3}: 2 \\
+\midrule
+\textbf{Total (75)} & \textbf{65 / 0 / 7 / 3} & \textbf{72 / 0 / 0 / 3} & \texttt{persona\_1}: 5, \texttt{persona\_3}: 2 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Distancia coseno a centroides y votación 5-NN (excluyendo la propia identidad) en el espacio de embeddings 128-D (\texttt{fc1\_relu}) para las identidades del portal.}
+\label{tab:diagnostico_embeddings_128d}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Identidad portal & Dist. \texttt{p1} & Dist. \texttt{p2} & Dist. \texttt{p3} & Dist. LFW & Mayoría autorizada en 5-NN \\
+\midrule
+\multicolumn{6}{c}{\textbf{Modelo Antialiasing (umbral 0.52)}} \\
+\midrule
+\texttt{david} (15 det.) & 0.3020 & 0.5769 & 0.4572 & 0.0437 & 0 / 15 \\
+\texttt{externo\_piloto} (12 det.) & 0.1536 & 0.4595 & 0.5789 & 0.1216 & 0 / 12 \\
+\texttt{paul} (15 det.) & 0.3022 & 0.5367 & 0.2873 & 0.1129 & 0 / 15 \\
+\texttt{sonia} (15 det.) & 0.3511 & 0.3575 & 0.6720 & 0.0520 & 0 / 15 \\
+\texttt{stevenl} (15 det.) & 0.2196 & 0.3938 & 0.3905 & 0.1578 & 1 / 15 \\
+\midrule
+\multicolumn{6}{c}{\textbf{Modelo Estándar (umbral 0.61)}} \\
+\midrule
+\texttt{david} (15 det.) & 0.3848 & 0.6692 & 0.4028 & 0.0343 & 0 / 15 \\
+\texttt{externo\_piloto} (12 det.) & 0.2983 & 0.5794 & 0.4576 & 0.0595 & 0 / 12 \\
+\texttt{paul} (15 det.) & 0.4282 & 0.6485 & 0.2610 & 0.0779 & 0 / 15 \\
+\texttt{sonia} (15 det.) & 0.4792 & 0.3819 & 0.5680 & 0.0427 & 0 / 15 \\
+\texttt{stevenl} (15 det.) & 0.3468 & 0.4972 & 0.3824 & 0.0810 & 0 / 15 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Robustez ante 11 perturbaciones sobre fotograma completo en desconocidos del portal (75 intentos) frente a autorizados de Sesión 04 (64 intentos; Acierto / Confusión / Bloqueo / Fallo det.).}
+\label{tab:diagnostico_11_perturbaciones}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Perturbación & AA 0.52 Portal FA (p1/p2/p3) & AA 0.52 \texttt{stevenl} FA & AA 0.52 S04 (A/C/B/F) & Std 0.61 Portal FA \\
+\midrule
+\texttt{limpia} & 7/75 (9.33\%) [5/0/2] & 6/15 & 63 / 0 / 1 / 0 & 0/75 (0.00\%) \\
+\texttt{oscura} & 60/75 (80.00\%) [0/1/59] & 15/15 & 35 / 29 / 0 / 0 & 17/75 (22.67\%) \\
+\texttt{oscura\_ruido} & 52/75 (69.33\%) [0/0/52] & 13/15 & 36 / 27 / 1 / 0 & 17/75 (22.67\%) \\
+\texttt{desenfoque} & 6/75 (8.00\%) [5/0/1] & 4/15 & 59 / 1 / 4 / 0 & 0/75 (0.00\%) \\
+\texttt{movimiento} & 7/75 (9.33\%) [6/0/1] & 4/15 & 63 / 0 / 1 / 0 & 0/75 (0.00\%) \\
+\texttt{oclusion\_inferior} & 29/75 (38.67\%) [2/3/24] & 11/15 & 52 / 9 / 2 / 1 & 16/75 (21.33\%) \\
+\texttt{oclusion\_lateral} & 18/75 (24.00\%) [4/2/12] & 4/15 & 51 / 6 / 5 / 2 & 15/75 (20.00\%) \\
+\texttt{rotacion\_+15} & 17/75 (22.67\%) [10/1/6] & 8/15 & 59 / 4 / 1 / 0 & 10/75 (13.33\%) \\
+\texttt{rotacion\_-15} & 10/75 (13.33\%) [8/1/1] & 4/15 & 57 / 1 / 0 / 6 & 3/75 (4.00\%) \\
+\texttt{baja\_res} & 6/75 (8.00\%) [5/0/1] & 5/15 & 60 / 0 / 4 / 0 & 0/75 (0.00\%) \\
+\texttt{jpeg\_q35} & 8/75 (10.67\%) [7/0/1] & 4/15 & 62 / 1 / 1 / 0 & 2/75 (2.67\%) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+El diagnóstico reveló cuatro hallazgos fundamentales:
+\begin{enumerate}
+    \item \textbf{Subajuste local de \texttt{stevenl} en la variante Antialiasing ($\tau = 0.52$) frente a ajuste completo en la Estándar ($\tau = 0.61$):} Bajo el esquema de balance en dos niveles (Tabla~\ref{tab:composicion_entrenamiento_pesos}), \texttt{persona\_1} posee un peso efectivo de $305.25$, mientras que cada identidad desconocida individual recibe $0.9539$ (un cociente de $305.25 / 0.9539 = 320.0\times$). En la variante Antialiasing ($\tau = 0.52$), ese peso reducido provocó que ni siquiera sus propias $15$ fotografías de entrenamiento se ajustaran por completo ($6/15$ falsas aceptaciones en fotos limpias de \texttt{stevenl} y $1/12$ en \texttt{externo\_piloto}). En contraste, la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)} rechazó el \textbf{$100\%$ de los rostros detectados del portal en limpio ($0/75$ falsas aceptaciones)}.
+    \item \textbf{Separación en el espacio de embeddings frente a frontera lineal Softmax:} Como muestra la Tabla~\ref{tab:diagnostico_embeddings_128d}, en el espacio latente de $128$ dimensiones (\texttt{fc1\_relu}) todas las identidades del portal tienen sus $5$ vecinos más cercanos dominados por la clase \texttt{desconocido} ($0/15$ muestras con mayoría autorizada en la CNN Estándar $0.61$). Sin embargo, \texttt{externo\_piloto} y \texttt{stevenl} son los dos sujetos geométricamente menos distantes al centroide de \texttt{persona\_1}, por lo que un umbral bajo ($0.52$) en la capa final \texttt{fc2} permite que crucen la frontera de decisión.
+    \item \textbf{Verificación en vivo con la CNN Estándar Portal Completo ($\tau = 0.61$):} Al establecer la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)} como modelo principal por defecto en el portal remoto y repetir las pruebas en vivo, las dos personas desconocidas previamente confundidas fueron clasificadas de forma correcta y consistente como \texttt{desconocido} (puerta \texttt{CERRADA}), mientras que \texttt{persona\_1} abrió la puerta con confianzas en vivo de $97.3\%\text{--}99.0\%$ y \texttt{persona\_2} abrió la puerta con $93.5\%$ de confianza (quedando únicamente pendiente la prueba en vivo de \texttt{persona\_3}).
+    \item \textbf{Vulnerabilidad ante oscuridad severa y oclusión parcial:} La Tabla~\ref{tab:diagnostico_11_perturbaciones} explica por qué un desconocido que se cubre parcialmente el rostro o apaga la luz puede ser aceptado por una red Softmax de $4$ clases: al oscurecer la imagen al $35\%$ (\texttt{oscura}) o cubrir el $40\%$ inferior del rostro (\texttt{oclusion\_inferior}), el tensor sale de la distribución de entrenamiento y produce en la CNN Estándar ($0.61$) tasas de falsa aceptación de $22.67\%$ ($17/75$) y $21.33\%$ ($16/75$), respectivamente.
+\end{enumerate}
+
+\subsection{Mejoras de Robustez: Fase 1 (Compuerta de Calidad) y Fase 2 (Reentrenamiento Robusto)}
+Para resolver la vulnerabilidad ante oscuridad, contraluz y oclusión inferior conservando intactos los pesos y la configuración predeterminada de la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)}, se implementaron y evaluaron dos fases incrementales en configuraciones separadas:
+
+\begin{enumerate}
+    \item \textbf{Fase 1 --- Compuerta de Calidad Facial sin Reentrenar (\path{configuracion_candidato_estandar_portal_061_calidad.json}):} Evalúa las ecuaciones~\eqref{eq:metricas_calidad} antes de la CNN ($\mu_I \ge 58.0$, $\sigma_I \ge 18.0$, $f_{\text{osc}} \le 0.35$, $G_{\text{inf}} \ge 4.2$, tamaño mínimo $36\;\text{px}$ y margen top-1 vs. top-2 $\ge 0.25$). Como demuestra la Tabla~\ref{tab:fase1_compuerta_calidad}, esta compuerta \textbf{elimina por completo las falsas aceptaciones en oscuridad ($22.67\% \to 0.00\%$), oscuridad con ruido ($22.67\% \to 0.00\%$) y oclusión inferior ($21.33\% \to 0.00\%$)}, manteniendo $0.00\%$ de FAR en fotos limpias del portal, $60/64$ aciertos ($0$ confusiones) en \texttt{sesion\_04} limpia y $57/63$ aciertos en \texttt{sesion\_05} limpia.
+    \item \textbf{Fase 2 --- Reentrenamiento Controlado con Aumentos de Oscuridad, Contraluz y Oclusión (\path{configuracion_candidato_fase2_robustez.json}, $\tau = 0.62$):} Se entrenó una nueva CNN en un directorio aislado sobre $2,131$ muestras ($1,221$ base + $455$ aumentos de oscuridad/contraluz + $455$ de oclusión/desenfoque), asignando el $30\%$ del peso de la clase \texttt{desconocido} a \texttt{desconocido\_portal} ($159.82$ unidades). Como muestran las Tablas~\ref{tab:fase2_entrenamiento_validacion_s05} y~\ref{tab:fase2_robustez_comparativa}, el modelo de Fase 2 aprende a rechazar intrínsecamente la oscuridad ($0.00\%$ FAR), el contraluz ($13.33\% \to 0.00\%$ FAR) y la oclusión inferior ($21.33\% \to 4.00\%$ FAR), con un compromiso (\textit{trade-off}) moderado en fotos limpias del portal ($6.67\%$ FAR) y en \texttt{sesion\_05} ($56/63$ aciertos, reduciendo las confusiones entre autorizados de $5$ a $3$).
+\end{enumerate}
+
+\begin{table}[htbp]
+\centering
+\caption{Fase 1: Evaluación de la compuerta de calidad sobre el modelo Estándar (umbral 0.61) en Portal (75 intentos), Sesión 04 (64 intentos) y Sesión 05 limpia (63 intentos).}
+\label{tab:fase1_compuerta_calidad}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Conjunto y condición & \multicolumn{3}{c}{Estándar 0.61 (sin compuerta)} & \multicolumn{3}{c}{Estándar 0.61 + compuerta de calidad} \\
+\midrule
+\textbf{Portal (75)} & FA (FAR) & Rech. cal. & Rech. mod./det. & FA (FAR) & Rech. cal. & Rech. mod./det. \\
+\midrule
+\texttt{limpia} & 0 (0.00\%) & 0 & 75 & \textbf{0 (0.00\%)} & 0 & 75 \\
+\texttt{oscura} & 17 (22.67\%) & 0 & 58 & \textbf{0 (0.00\%)} & 71 & 4 \\
+\texttt{oscura\_ruido} & 17 (22.67\%) & 0 & 58 & \textbf{0 (0.00\%)} & 62 & 13 \\
+\texttt{oclusion\_inferior} & 16 (21.33\%) & 0 & 59 & \textbf{0 (0.00\%)} & 64 & 11 \\
+\texttt{oclusion\_lateral} & 15 (20.00\%) & 0 & 60 & 15 (20.00\%) & 5 & 55 \\
+\texttt{rotacion\_+15} & 10 (13.33\%) & 0 & 65 & 9 (12.00\%) & 0 & 66 \\
+\texttt{desenfoque} & 0 (0.00\%) & 0 & 75 & 0 (0.00\%) & 1 & 74 \\
+\midrule
+\textbf{Sesión 04 (64)} & Aciertos / Conf. & Bloq. cal. & Bloq. o det. & Aciertos / Conf. & Bloq. cal. & Bloq. o det. \\
+\midrule
+\texttt{limpia} & 63 / 0 & 0 & 1 & 60 / 0 & 2 & 2 \\
+\texttt{oscura} & 36 / 1 & 0 & 27 & 0 / 0 & 64 & 0 \\
+\texttt{oscura\_ruido} & 35 / 0 & 0 & 29 & 0 / 0 & 64 & 0 \\
+\texttt{oclusion\_inferior} & 48 / 10 & 0 & 6 & 1 / 0 & 62 & 1 \\
+\midrule
+\textbf{Sesión 05 limpia (63)} & 58 / 5 & 0 & 0 & 57 / 5 & 1 & 0 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Fase 2: Composición de entrenamiento con aumento de robustez (2,131 muestras totales), calibración en validación y desempeño en Sesión 05 (63 intentos).}
+\label{tab:fase2_entrenamiento_validacion_s05}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+\multicolumn{6}{c}{\textbf{A. Composición de entrenamiento y pesos efectivos en \texttt{desconocido}}} \\
+\midrule
+Bloque / Fuente & Muestras & Peso total & Peso / muestra & \multicolumn{2}{c}{Observación} \\
+\midrule
+Base original & 1,221 & --- & --- & \multicolumn{2}{c}{Partición base balanceada} \\
+Aum. oscuridad y contraluz & 455 & --- & --- & \multicolumn{2}{c}{Aumento fotométrico} \\
+Aum. oclusión y desenfoque & 455 & --- & --- & \multicolumn{2}{c}{Aumento de degradación} \\
+\texttt{desconocido\_portal} (Fase 2) & 216 & 159.82 & 0.7399 & \multicolumn{2}{c}{30\% de la clase \texttt{desconocido}} \\
+\texttt{desconocido\_universidad} (Fase 2) & 75 & 79.91 & 1.0655 & \multicolumn{2}{c}{15\% de la clase \texttt{desconocido}} \\
+\texttt{desconocido\_lfw} (Fase 2) & 500 & 293.01 & 0.5860 & \multicolumn{2}{c}{55\% de la clase \texttt{desconocido}} \\
+\midrule
+\multicolumn{6}{c}{\textbf{B. Validación automática (64 autorizados, 100 LFW, 7 universitarios) y Sesión 05 (63 intentos)}} \\
+\midrule
+Evaluación / Modelo & Umbral & Correctas / Conf. & Bloq. / Fallo & $\text{FRR}_{\text{puerta}}$ & $\text{FAR}_{\text{global}}$ (LFW / Univ) \\
+\midrule
+Validación Fase 2 (Regla A) & --- & 63 / 0 (de 64) & 1 / 0 & 1.56\% (1/64) & 0.93\% (1.00\% / 0.00\%) \\
+Validación Fase 2 (Regla B) & 0.62 & 62 / 0 (de 64) & 2 / 0 & 3.12\% (2/64) & 0.00\% (0.00\% / 0.00\%) \\
+Sesión 05: Estándar & 0.61 & 58 / 5 (de 63) & 0 / 0 & 0.00\% (0/63) & --- \\
+Sesión 05: Fase 2 Robustez & 0.62 & 56 / 3 (de 63) & 4 / 0 & 6.35\% (4/63) & --- \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Fase 2: Comparación de robustez entre el modelo Estándar (0.61) y el modelo Fase 2 Robustez (0.62) sobre Portal (75 intentos) y Sesión 04 (64 intentos).}
+\label{tab:fase2_robustez_comparativa}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Condición & \multicolumn{2}{c}{Portal (75): FA (FAR)} & \multicolumn{2}{c}{Sesión 04 (64): Estándar 0.61} & \multicolumn{2}{c}{Sesión 04 (64): Fase 2 (0.62)} \\
+ & Estándar 0.61 & Fase 2 (0.62) & Aciertos / Conf. & Bloq. o det. & Aciertos / Conf. & Bloq. o det. \\
+\midrule
+\texttt{limpia} & \textbf{0 (0.00\%)} & 5 (6.67\%) & 63 / 0 & 1 & 62 / 0 & 2 \\
+\texttt{oscura} & 17 (22.67\%) & \textbf{0 (0.00\%)} & 36 / 1 & 27 & 14 / 0 & 50 \\
+\texttt{oscura\_ruido} & 17 (22.67\%) & \textbf{0 (0.00\%)} & 35 / 0 & 29 & 16 / 0 & 48 \\
+\texttt{contraluz} & 10 (13.33\%) & \textbf{0 (0.00\%)} & 36 / 0 & 28 & 22 / 0 & 42 \\
+\texttt{oclusion\_inferior} & 16 (21.33\%) & \textbf{3 (4.00\%)} & 48 / 10 & 6 & 23 / 6 & 35 \\
+\texttt{oclusion\_lateral} & 15 (20.00\%) & \textbf{8 (10.67\%)} & 41 / 4 & 19 & 19 / 2 & 43 \\
+\texttt{rotacion\_+15} & 10 (13.33\%) & 10 (13.33\%) & 53 / 4 & 7 & 43 / 7 & 14 \\
+\texttt{desenfoque} & \textbf{0 (0.00\%)} & 5 (6.67\%) & 58 / 1 & 5 & 55 / 0 & 9 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+% ==============================================================================
+\section{Conclusiones}
+% ==============================================================================
+
+\begin{enumerate}
+    \item \textbf{Consolidación del Pipeline de Cuatro Fases sin Postprocesamiento:} Se demostró experimentalmente que una arquitectura bien estructurada en cuatro etapas (adquisición aislada por sesión e identidad, preprocesamiento espacial riguroso, extracción de características adaptada a cada familia algorítmica y clasificación supervisada con regla determinista de rechazo) permite operar en tiempo real ($\sim 19\;\text{ms}$ por fotograma) sin depender de etapas heurísticas de postprocesamiento.
+    \item \textbf{Separación Estricta entre Detección Espacial (YuNet) e Identificación (CNN):} La utilización de YuNet exclusivamente como localizador geométrico de rostros y puntos anatómicos en cascada multi-orientación ($0^\circ, 90^\circ, 270^\circ, 180^\circ$), acoplada a la transformación de similitud 2D hacia la plantilla canónica de $64 \times 64$, proporcionó invarianza a rotaciones del dispositivo móvil. El reconocimiento facial recayó íntegramente en la CNN de cuatro clases entrenada por el equipo.
+    \item \textbf{Importancia del Filtrado Espacial por Convolución y Máscaras:} La aplicación de convoluciones discretas bidimensionales con máscaras pasa-bajos gaussianas ($5 \times 5, \sigma = 0.5$) estabilizó la relación señal-ruido antes de la extracción de características, mientras que los operadores pasa-altos de acentuado (máscara $3 \times 3$ de suma nula, filtro \textit{High-Boost} y gradiente discreto $L_1$) resultaron determinantes tanto para la inspección de bordes anatómicos como para la detección temprana de oclusiones en la compuerta de calidad.
+    \item \textbf{Superioridad Empírica de la CNN frente a Clasificadores Vectoriales:} En la comparación controlada sobre la partición de validación automática, la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)} superó ampliamente a Árbol de Decisión, KNN, SVM y ANN densa, alcanzando $63/64$ identificaciones correctas ($98.44\%$), $0$ confusiones entre usuarios autorizados, $\text{FRR}_{\text{puerta}} = 1.56\%$ y $\text{FAR}_{\text{global}} = 0.00\%$ ($0/107$), además de lograr $58/63$ ($92.06\%$, $0$ bloqueos) en la prueba histórica \texttt{sesion\_05} y validar en vivo desde el portal remoto a \texttt{persona\_1} ($97.3\%\text{--}99.0\%$) y \texttt{persona\_2} ($93.5\%$) rechazando correctamente a los sujetos desconocidos.
+    \item \textbf{Mitigación de Degradaciones Físicas en Conjunto Abierto:} El diagnóstico del espacio latente de $128$ dimensiones demostró que las falsas aceptaciones observadas inicialmente con el candidato de umbral $0.52$ provenían de la asimetría de peso individual ($1/320$) y de perturbaciones fuera de distribución (oscuridad y oclusión inferior). La promoción de la \textbf{CNN Estándar ($\tau = 0.61$)} como modelo predeterminado, complementada opcionalmente con la compuerta de calidad de Fase 1 ($0.00\%$ FAR en oscuridad y oclusión inferior sin reentrenar) y el modelo experimental de Fase 2 ($\tau = 0.62$, $0.00\%$ FAR en oscuridad y contraluz), dota al sistema de una arquitectura verificada, trazable y segura para su demostración final.
+\end{enumerate}
+
+\end{document}

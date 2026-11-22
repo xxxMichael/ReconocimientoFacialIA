@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Portal de Captura - Voluntario {{ identificador }}</title>
+  <link rel="stylesheet" href="/static/portal.css">
+</head>
+<body data-token="{{ token }}" data-identificador="{{ identificador }}">
+  <header class="barra-superior">
+    <div class="contenedor-header">
+      <div class="identidad-badge">
+        <span class="punto-estado"></span>
+        <span class="etiqueta-id">Participante:</span>
+        <strong id="badge-identificador">{{ identificador }}</strong>
+      </div>
+      <div class="contador-resumen" id="resumen-contador">
+        <span id="txt-contador">0 / 15</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="contenedor-principal">
+    <!-- Aviso sobre protocolo HTTPS para cámaras remotas -->
+    <div id="banner-https" class="banner-alerta oculto">
+      <span class="icono">🔒</span>
+      <div class="contenido-alerta">
+        <strong>Acceso seguro a la cámara:</strong>
+        <p>Los navegadores modernos exigen conexión cifrada <code>HTTPS</code> para acceder a la cámara desde un celular o red externa. Si observa fallos de permiso, asegúrese de acceder mediante el enlace HTTPS temporal de Cloudflare Tunnel.</p>
+      </div>
+    </div>
+
+    <!-- Mensajes de estado y notificación -->
+    <div id="caja-notificaciones" class="notificacion oculto"></div>
+
+    <!-- PASO 1: Consentimiento informado -->
+    <section id="seccion-consentimiento" class="tarjeta paso-consentimiento">
+      <h2>1. Consentimiento Informado</h2>
+      <div class="texto-consentimiento">
+        <p>Usted ha sido invitado a participar de forma voluntaria y anónima en una prueba de evaluación para un prototipo académico de visión por computador (Asignatura Inteligencia Artificial 2).</p>
+        <ul>
+          <li><strong>Identidad anónima:</strong> Sus fotografías se registrarán exclusivamente bajo el código <code>{{ identificador }}</code> y se emplearán únicamente para evaluar tasas de rechazo frente a personas no autorizadas.</li>
+          <li><strong>Protocolo breve:</strong> Se le solicitarán 15 fotografías variando 5 poses moderadas y 3 distancias de captura.</li>
+          <li><strong>Sin exposición pública:</strong> El sistema no expone sus fotografías públicamente ni las compartirá con terceros.</li>
+        </ul>
+      </div>
+
+      <div class="fila-checkbox" id="contenedor-checkbox-consentimiento">
+        <label class="etiqueta-checkbox" for="chk-consentimiento">
+          <input type="checkbox" id="chk-consentimiento">
+          <span>He leído las condiciones y doy mi <strong>consentimiento explícito</strong> para la captura de mis 15 fotografías con fines académicos.</span>
+        </label>
+      </div>
+
+      <button type="button" id="btn-confirmar-consentimiento" class="btn-primario ancho-completo">
+        Confirmar Consentimiento y Continuar
+      </button>
+    </section>
+
+    <!-- PASO 2: Selección de Pose y Distancia -->
+    <section id="seccion-protocolo" class="tarjeta bloque-deshabilitado">
+      <div class="encabezado-seccion">
+        <h2>2. Configuración de la Fotografía</h2>
+        <span class="badge-paso">Combinación requerida</span>
+      </div>
+
+      <!-- Selector de Pose -->
+      <div class="grupo-seleccion">
+        <label class="etiqueta-campo">Pose de la cabeza (según su propia perspectiva):</label>
+        <div class="cuadricula-opciones poses" id="selector-poses">
+          <button type="button" class="btn-opcion activa" data-pose="frontal">
+            <span class="icono-opcion">👤</span>
+            <span class="texto-opcion">Frontal</span>
+            <small>Mirando directo</small>
+          </button>
+          <button type="button" class="btn-opcion" data-pose="izquierda">
+            <span class="icono-opcion">👈</span>
+            <span class="texto-opcion">Tu Izquierda</span>
+            <small>Giro leve (~20°)</small>
+          </button>
+          <button type="button" class="btn-opcion" data-pose="derecha">
+            <span class="icono-opcion">👉</span>
+            <span class="texto-opcion">Tu Derecha</span>
+            <small>Giro leve (~20°)</small>
+          </button>
+          <button type="button" class="btn-opcion" data-pose="arriba">
+            <span class="icono-opcion">👆</span>
+            <span class="texto-opcion">Arriba</span>
+            <small>Mirar arriba</small>
+          </button>
+          <button type="button" class="btn-opcion" data-pose="abajo">
+            <span class="icono-opcion">👇</span>
+            <span class="texto-opcion">Abajo</span>
+            <small>Mirar abajo</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- Selector de Distancia -->
+      <div class="grupo-seleccion">
+        <label class="etiqueta-campo">Distancia aproximada a la cámara:</label>
+        <div class="cuadricula-opciones distancias" id="selector-distancias">
+          <button type="button" class="btn-opcion activa" data-distancia="cercana">
+            <span class="icono-opcion">🔍</span>
+            <span class="texto-opcion">Cercana</span>
+            <small>Primer plano (~40 cm)</small>
+          </button>
+          <button type="button" class="btn-opcion" data-distancia="media">
+            <span class="icono-opcion">🧍</span>
+            <span class="texto-opcion">Media</span>
+            <small>Rostro y hombros (~1 m)</small>
+          </button>
+          <button type="button" class="btn-opcion" data-distancia="lejana">
+            <span class="icono-opcion">📏</span>
+            <span class="texto-opcion">Lejana</span>
+            <small>Cintura arriba (~1.8 m)</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="estado-combinacion" id="aviso-combinacion">
+        <span class="icono">ℹ️</span>
+        <span id="texto-estado-combinacion">Combinación actual: <strong>Frontal - Cercana</strong> (Pendiente)</span>
+      </div>
+    </section>
+
+    <!-- PASO 3: Cámara y Captura -->
+    <section id="seccion-camara" class="tarjeta bloque-deshabilitado">
+      <div class="encabezado-seccion">
+        <h2>3. Captura Fotográfica</h2>
+        <div class="botones-control-camara">
+          <button id="btn-cambiar-camara" class="btn-icono" title="Cambiar a cámara frontal/trasera">
+            🔄 Cambiar Cámara
+          </button>
+          <button id="btn-toggle-camara" class="btn-icono">
+            📹 Iniciar Cámara
+          </button>
+        </div>
+      </div>
+
+      <!-- Visor de cámara y vista previa -->
+      <div class="visor-camara" id="contenedor-visor">
+        <video id="video-camara" playsinline autoplay muted class="espejo"></video>
+        <canvas id="canvas-captura" class="oculto"></canvas>
+        <img id="img-previsualizacion" class="oculto" alt="Vista previa de captura">
+        <div id="badge-captura-fijada" class="badge-fijada oculto"></div>
+
+        <div id="overlay-camara-inactiva" class="overlay-visor">
+          <span class="icono-grande">📷</span>
+          <p>Presione <strong>"Iniciar Cámara"</strong> o permita el acceso en su navegador.</p>
+          <button type="button" id="btn-activar-desde-overlay" class="btn-primario" style="margin-top: 6px;">
+            📹 Iniciar Cámara
+          </button>
+        </div>
+
+        <div id="indicador-cargando" class="overlay-visor oculto">
+          <div class="rueda-progreso"></div>
+          <p id="texto-cargando">Procesando...</p>
+        </div>
+      </div>
+
+      <!-- Controles de acción tras capturar -->
+      <div class="fila-acciones">
+        <button id="btn-tomar-foto" class="btn-primario" disabled>
+          📸 Capturar Fotograma
+        </button>
+        <button id="btn-repetir-foto" class="btn-secundario oculto">
+          ↩️ Repetir
+        </button>
+        <button id="btn-enviar-foto" class="btn-exito oculto">
+          🚀 Enviar Fotografía
+        </button>
+      </div>
+
+      <!-- Fallback nativo para smartphones -->
+      <div class="separador-o"><span>o también</span></div>
+      <div class="fallback-nativo">
+        <input type="file" id="input-archivo-nativo" accept="image/*" capture="user" class="oculto">
+        <button type="button" id="btn-activar-nativo" class="btn-secundario ancho-completo">
+          📱 Tomar Foto con Cámara Nativa del Teléfono
+        </button>
+        <small class="nota-ayuda">Útil si su navegador bloquea el acceso en vivo o experimenta problemas de compatibilidad.</small>
+      </div>
+    </section>
+
+    <!-- PASO 4: Progreso Personal -->
+    <section id="seccion-progreso" class="tarjeta">
+      <div class="encabezado-seccion">
+        <h2>4. Su Progreso en el Estudio</h2>
+        <span class="badge-progreso" id="badge-pct-progreso">0%</span>
+      </div>
+
+      <div class="barra-progreso-contenedor">
+        <div class="barra-progreso-relleno" id="barra-progreso" style="width: 0%;"></div>
+      </div>
+      <p class="resumen-texto-progreso">
+        Ha enviado <strong id="lbl-enviadas">0</strong> de <strong>15</strong> fotografías requeridas
+        (<span id="lbl-pendientes">15</span> restantes).
+      </p>
+
+      <!-- Matriz visual de 15 combinaciones -->
+      <div class="contenedor-matriz">
+        <table class="tabla-matriz">
+          <thead>
+            <tr>
+              <th>Pose \ Distancia</th>
+              <th>Cercana</th>
+              <th>Media</th>
+              <th>Lejana</th>
+            </tr>
+          </thead>
+          <tbody id="filas-matriz-progreso">
+            <!-- Rellenado dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+
+      <div id="banner-completado" class="banner-exito oculto">
+        <span class="icono">🎉</span>
+        <div>
+          <strong>¡Protocolo Completado con Éxito!</strong>
+          <p>Ha completado las 15 fotografías requeridas para el participante <code>{{ identificador }}</code>. Su colaboración ha quedado registrada de forma anónima y segura. ¡Muchas gracias!</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie-portal">
+    <p>Estudio de Reconocimiento Facial IA 2 &bull; Sistema de Captura Externa Independiente &bull; Puerto Seguro</p>
+  </footer>
+
+  <script src="/static/portal.js"></script>
+</body>
+</html>

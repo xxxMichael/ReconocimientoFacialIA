@@ -58,7 +58,10 @@ class TestAdquisicion(unittest.TestCase):
             consentimiento=True
         )
         manifiesto.agregar_registro(r1)
-        manifiesto.agregar_registro(r2)
+        with self.assertRaisesRegex(ValueError, "Inconsistencia de protocolo"):
+            manifiesto.agregar_registro(r2)
+        # La auditoría también debe detectar filas históricas incoherentes.
+        manifiesto.registros.append(r2)
 
         es_valido, errores = manifiesto.validar_aislamiento_sesiones()
         self.assertFalse(es_valido)
