@@ -1,0 +1,17 @@
+{
+  "dataset": "Labeled Faces in the Wild (LFW)",
+  "variante": "lfw_funneled",
+  "fuente_local": "C:\\Users\\Mayck\\scikit_learn_data\\lfw_home\\lfw_funneled",
+  "caracteristicas": "Fotografías prealineadas (funneled), de un dominio diferente al de una webcam. Son negativos de referencia y no sustituyen negativos reales de webcam.",
+  "uso": "Solo calibración y reserva de prueba. Excluir del entrenamiento y de las clases softmax.",
+  "seleccion": "Orden SHA-256 de semilla e identidad normalizada; primera foto elegible por nombre.",
+  "semilla": "lfw_desconocidos_v1",
+  "manifiestos_excluidos": [
+    "resultados/evaluacion_externa_lfw_cnn/manifiesto_lfw_100.csv"
+  ],
+  "identidades_historicas_excluidas": 100,
+  "particiones": {
+    "calibracion": 100,
+    "reserva_prueba": 100
+  }
+}

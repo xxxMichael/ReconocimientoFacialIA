@@ -1,0 +1,342 @@
+{
+  "universidad_001": {
+    "decision": "aprobada",
+    "caja": [
+      578,
+      648,
+      866,
+      1162
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_002": {
+    "decision": "aprobada",
+    "caja": [
+      173,
+      315,
+      296,
+      388
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_003": {
+    "decision": "aprobada",
+    "caja": [
+      128,
+      165,
+      327,
+      397
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_004": {
+    "decision": "aprobada",
+    "caja": [
+      326,
+      494,
+      123,
+      155
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_005": {
+    "decision": "aprobada",
+    "caja": [
+      346,
+      176,
+      322,
+      434
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_006": {
+    "decision": "aprobada",
+    "caja": [
+      150,
+      137,
+      439,
+      555
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_007": {
+    "decision": "aprobada",
+    "caja": [
+      1100,
+      162,
+      183,
+      235
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_008": {
+    "decision": "aprobada",
+    "caja": [
+      294,
+      113,
+      247,
+      350
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_009": {
+    "decision": "aprobada",
+    "caja": [
+      443,
+      155,
+      324,
+      468
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_010": {
+    "decision": "aprobada",
+    "caja": [
+      95,
+      137,
+      153,
+      185
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_011": {
+    "decision": "aprobada",
+    "caja": [
+      179,
+      113,
+      287,
+      421
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_012": {
+    "decision": "aprobada",
+    "caja": [
+      341,
+      412,
+      626,
+      788
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_013": {
+    "decision": "aprobada",
+    "caja": [
+      508,
+      152,
+      441,
+      538
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_014": {
+    "decision": "aprobada",
+    "caja": [
+      128,
+      145,
+      168,
+      228
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_015": {
+    "decision": "aprobada",
+    "caja": [
+      189,
+      86,
+      132,
+      163
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_016": {
+    "decision": "aprobada",
+    "caja": [
+      670,
+      104,
+      220,
+      299
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_017": {
+    "decision": "aprobada",
+    "caja": [
+      790,
+      166,
+      237,
+      308
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_018": {
+    "decision": "aprobada",
+    "caja": [
+      612,
+      139,
+      220,
+      287
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_019": {
+    "decision": "aprobada",
+    "caja": [
+      728,
+      136,
+      251,
+      309
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_020": {
+    "decision": "aprobada",
+    "caja": [
+      233,
+      103,
+      159,
+      232
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_021": {
+    "decision": "aprobada",
+    "caja": [
+      458,
+      368,
+      232,
+      285
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_022": {
+    "decision": "aprobada",
+    "caja": [
+      57,
+      144,
+      502,
+      437
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_023": {
+    "decision": "aprobada",
+    "caja": [
+      190,
+      149,
+      197,
+      255
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_024": {
+    "decision": "aprobada",
+    "caja": [
+      528,
+      105,
+      223,
+      301
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_025": {
+    "decision": "aprobada",
+    "caja": [
+      206,
+      122,
+      176,
+      241
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_026": {
+    "decision": "aprobada",
+    "caja": [
+      279,
+      63,
+      161,
+      201
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_027": {
+    "decision": "aprobada",
+    "caja": [
+      314,
+      129,
+      221,
+      314
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_028": {
+    "decision": "aprobada",
+    "caja": [
+      273,
+      186,
+      217,
+      308
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_029": {
+    "decision": "aprobada",
+    "caja": [
+      270,
+      161,
+      282,
+      424
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_030": {
+    "decision": "aprobada",
+    "caja": [
+      82,
+      179,
+      208,
+      275
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_031": {
+    "decision": "aprobada",
+    "caja": [
+      114,
+      204,
+      285,
+      360
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_032": {
+    "decision": "aprobada",
+    "caja": [
+      60,
+      76,
+      195,
+      262
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_033": {
+    "decision": "aprobada",
+    "caja": [
+      203,
+      131,
+      302,
+      384
+    ],
+    "origen_caja": "recalculada"
+  },
+  "universidad_034": {
+    "decision": "aprobada",
+    "caja": [
+      341,
+      76,
+      242,
+      330
+    ],
+    "origen_caja": "recalculada"
+  }
+}

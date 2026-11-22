@@ -41,5 +41,9 @@
 !/data/propio/imagenes/**/*.jpg
 !/data/propio/imagenes/**/*.jpeg
 !/data/propio/imagenes/**/*.png
+!/data/desconocidos_lfw/
+!/data/desconocidos_lfw/**
+!/data/universidad_desc/
+!/data/universidad_desc/**
 __pycache__/
 *.egg-info/

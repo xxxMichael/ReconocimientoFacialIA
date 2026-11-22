@@ -1,0 +1,409 @@
+{
+  "semilla": "lfw_desconocidos_entrenamiento_4clases_v1",
+  "candidatos_rechazados": [
+    {
+      "identidad": "robert duvall",
+      "foto": "Robert_Duvall_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "0d61c399737dc7e0458cf4c2001acbc69d5049b618cade590c0d83e3e9d11554"
+    },
+    {
+      "identidad": "jean-claude braquet",
+      "foto": "Jean-Claude_Braquet_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "fcf63fede321eab306b9b95d3a64a435b580a8c860c860e07e8177febe172367"
+    },
+    {
+      "identidad": "angie martinez",
+      "foto": "Angie_Martinez_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1f50fe3822645ec3d8128115b9b19a8837c5096464372ed1415654577b694386"
+    },
+    {
+      "identidad": "elizabeth smart",
+      "foto": "Elizabeth_Smart_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "55cf797651f8fb9ef6c438d7e81ec59e4db0a80d60c868ff244afac4a0002d71"
+    },
+    {
+      "identidad": "elizabeth smart",
+      "foto": "Elizabeth_Smart_0002.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "76c2445240213ea0c8ad0018e8ff9a0509e0b0b90ef7c2131321c2894f598967"
+    },
+    {
+      "identidad": "roseanne barr",
+      "foto": "Roseanne_Barr_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "dc76a8b48c217927da48290261545a52a02b41d1b2245eefcf3f634dbfdc6266"
+    },
+    {
+      "identidad": "emmanuelle jagodsinski",
+      "foto": "Emmanuelle_Jagodsinski_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "6ea57ddfbefd667d5196e53d47cbda02f2653949a04ff6dc369e86f206750984"
+    },
+    {
+      "identidad": "gracia burnham",
+      "foto": "Gracia_Burnham_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "358021a02a5aa92e7a5bf99e5be9a2c75eec29c51bb088bb2fc36978a5f25206"
+    },
+    {
+      "identidad": "anwar ibrahim",
+      "foto": "Anwar_Ibrahim_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "e7524a61a86cdb3b0dab21ec840381901640fd293e469f6fb8df07b1a3398e38"
+    },
+    {
+      "identidad": "yashwant sinha",
+      "foto": "Yashwant_Sinha_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "62e7103a581ff8fbbe6295872bbca516d835c04d7e77adb67ca876fa622b5684"
+    },
+    {
+      "identidad": "yashwant sinha",
+      "foto": "Yashwant_Sinha_0002.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "f8e04a0681501d0a3ba5085e5ce22f73c1e6c07115a3e6a4f3d0c40448f072dc"
+    },
+    {
+      "identidad": "gary bettman",
+      "foto": "Gary_Bettman_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "b8e8c0374a6d6dbf7213dd0866ca2102f23c6b451089d1f73ae7cb2d46b8618e"
+    },
+    {
+      "identidad": "kim clijsters",
+      "foto": "Kim_Clijsters_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1eeea6cf87f6dc7730d8f142c78ffd82c6f270e72d254966849054b1caf747b2"
+    },
+    {
+      "identidad": "nikki mckibbin",
+      "foto": "Nikki_McKibbin_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "d97deaaa6c1d52cd153b2e11dbf1e0ad535c5041b7e20752d915687fe9f952ee"
+    },
+    {
+      "identidad": "farouk kaddoumi",
+      "foto": "Farouk_Kaddoumi_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "fcdc6780fc9dc5fb66bc89f1ac8b9b0be898311f2ab6ad29a561bfc3d7127131"
+    },
+    {
+      "identidad": "leticia van de putte",
+      "foto": "Leticia_Van_de_Putte_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "685f53c7f5f6dbc5e80cb8f6442255c9d4d1cf935f1b8ad7fafe3e13619bb03c"
+    },
+    {
+      "identidad": "richard myers",
+      "foto": "Richard_Myers_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "12a298f3e8480b117998a8260e7eefe094ef532c81729a9326a853ecba0440a5"
+    },
+    {
+      "identidad": "sandra bullock",
+      "foto": "Sandra_Bullock_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "288a96af1b741df3af71fbe25e8a5d8004f9265de121908c92c898e04bcf8309"
+    },
+    {
+      "identidad": "lynn abraham",
+      "foto": "Lynn_Abraham_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "b12869c0324a4bd1cb4e288f656f2fb604efab0c3046e9150cb4aec188fad8c4"
+    },
+    {
+      "identidad": "lynn abraham",
+      "foto": "Lynn_Abraham_0002.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "0061a55fced33f6860c03ea4302daf44226f04df00ae1c7b13aca418f041441e"
+    },
+    {
+      "identidad": "leonard schrank",
+      "foto": "Leonard_Schrank_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "06a8f1c747b9ac17fbca0c65b591eb2d0857af8ea574e931adbbe6e2cee38245"
+    },
+    {
+      "identidad": "david bell",
+      "foto": "David_Bell_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "125ec759035a7ccbff6e6b6f67f653a017c284b54c441fad855c6ca590d3fa0e"
+    },
+    {
+      "identidad": "floyd mayweather",
+      "foto": "Floyd_Mayweather_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "2566a00a9349f098d746ca14f05bcec537dd65df61d0fd226c087e17d31c2681"
+    },
+    {
+      "identidad": "gao qiang",
+      "foto": "Gao_Qiang_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "d0c10ac185d2cde02997f703b8d1a09e42f2963d157e6dda9eeafd56e8c428ca"
+    },
+    {
+      "identidad": "chawki armali",
+      "foto": "Chawki_Armali_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "2720ea63dee260ee758e356c9cf7d84302d84f3107a91cf865bab94cf1a6d874"
+    },
+    {
+      "identidad": "roman tam",
+      "foto": "Roman_Tam_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "bdaeeafc9561ee466cbbdd2838438536fecb47f9d2734f3f0bd86d96364b4f5f"
+    },
+    {
+      "identidad": "kelly osbourne",
+      "foto": "Kelly_Osbourne_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "d46a6096493586da03d788d29b34907a65383db50e45a0b17151055f80f25cc0"
+    },
+    {
+      "identidad": "takahiro mori",
+      "foto": "Takahiro_Mori_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "4202ca3ebda189b8aca5f7fe3942e032829670d6a2bf7c50a59f407a7e0cdbf3"
+    },
+    {
+      "identidad": "jose lopez beltran",
+      "foto": "Jose_Lopez_Beltran_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "baff2b6c52ee0122a91b63c13b92e2513e40b35ea98093c19105206977fe5bed"
+    },
+    {
+      "identidad": "mohamed hammam",
+      "foto": "Mohamed_Hammam_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "cd1fca12c435b44454f3adf20829af6908fa1f3fe799e05ea4ef0fe18db59d49"
+    },
+    {
+      "identidad": "zalmay khalilzad",
+      "foto": "Zalmay_Khalilzad_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "29cf77e3e3cd91a57ded1711cc802cd2ad135eeca93cd6aaf3d3f268adb270c3"
+    },
+    {
+      "identidad": "tanya holyk",
+      "foto": "Tanya_Holyk_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "80f009e44a1234f7d7907560a12f96b6702a48584369c36f0e6960191501f625"
+    },
+    {
+      "identidad": "lesley coppin",
+      "foto": "Lesley_Coppin_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "ca6486727fa640d7c058167f40d33305023429048129a04e708dff23e8952cd6"
+    },
+    {
+      "identidad": "jafar umar thalib",
+      "foto": "Jafar_Umar_Thalib_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "4dd04eeddbc13f0e3e4ff68c34ce47db3b76a4c5856bb43ee607f5d4f9b24c9a"
+    },
+    {
+      "identidad": "pauley perrette",
+      "foto": "Pauley_Perrette_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "0a8c961dbd2f1f5974a9deec3036971392565f739326b9e807ef3417a42bc0e8"
+    },
+    {
+      "identidad": "megan mullally",
+      "foto": "Megan_Mullally_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "c2979d6df3d552a49219329e922c52e2855023c391bff4ebd9382cfaed876f12"
+    },
+    {
+      "identidad": "john rowland",
+      "foto": "John_Rowland_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "4f4a283b2a57ca92cc1e5f8e2f7cbd1e18183b116ce9f9884df408088a4eb74f"
+    },
+    {
+      "identidad": "jean-claude van damme",
+      "foto": "Jean-Claude_Van_Damme_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1e28731d6d42c41e196fc2eb7954fcbcdc3c6fc243c0da8086ccaceb1f2f42ef"
+    },
+    {
+      "identidad": "michael shelby",
+      "foto": "Michael_Shelby_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "74248f9201203b0ddb4a0445725ff4a6aec8872a35785994dbf74312f0d2c291"
+    },
+    {
+      "identidad": "lynne cheney",
+      "foto": "Lynne_Cheney_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "ecc19ba1e61fd64ebedf731f8bf8deda5b4c66f4c4008c087a843620141e88be"
+    },
+    {
+      "identidad": "robbie naish",
+      "foto": "Robbie_Naish_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "ff3b53fe81a002204f49a61207a98d7005847d283099067adb1090f78fdd3356"
+    },
+    {
+      "identidad": "tassos papadopoulos",
+      "foto": "Tassos_Papadopoulos_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1c1f873bd90a0564ebfdde380f0789bf33eab86f9bc34c6e03d620e95beeb50d"
+    },
+    {
+      "identidad": "natalia motuziuk",
+      "foto": "Natalia_Motuziuk_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "3a9947590b406769fbbd32988f5fc63cf9916cf4830b29718c1f86bb930b03bf"
+    },
+    {
+      "identidad": "robbie coltrane",
+      "foto": "Robbie_Coltrane_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "495475b172b0f90799210ae881dd66018a71ace2c3d3973717c878b8864ffa0b"
+    },
+    {
+      "identidad": "edward egan",
+      "foto": "Edward_Egan_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "c7b19baaeec7d3b88f6b438eee4210659fa46427358a214ea2bcf3a81d66c3ab"
+    },
+    {
+      "identidad": "cheryl hines",
+      "foto": "Cheryl_Hines_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1a9aad8036f87b0d66e7db1a8743cce9a68346012c5290ecff53383318927ab3"
+    },
+    {
+      "identidad": "carson daly",
+      "foto": "Carson_Daly_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "5c66e2737784627203e2fd6e3236df2a2a8a09b0ae6aa2d726d246723be5bc2c"
+    },
+    {
+      "identidad": "tom craddick",
+      "foto": "Tom_Craddick_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "96237133a6a7e7bd3e03d1ba6d9fd55ed928a5feb8131ca6a2b632500308ce7e"
+    },
+    {
+      "identidad": "tom craddick",
+      "foto": "Tom_Craddick_0002.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "d997316961ff57e86f0aa7fc652d4318f462eae796e26d09273c1e165d2a5f60"
+    },
+    {
+      "identidad": "linda dano",
+      "foto": "Linda_Dano_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "cd8e8341222dfbc9a2d819cf1c03719d2ac622492cd16dc358da1ed00186afd6"
+    },
+    {
+      "identidad": "shannyn sossamon",
+      "foto": "Shannyn_Sossamon_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "ce4268ec212d2215c77dbfcc2f2bb9f434c30dd709513b5bb6b0adec5317bc27"
+    },
+    {
+      "identidad": "nancy greenlaw",
+      "foto": "Nancy_Greenlaw_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "1d07af751b99968888930bfde401084ff0f1adf11e83336a69142a1ba76d536f"
+    },
+    {
+      "identidad": "marco irizarry",
+      "foto": "Marco_Irizarry_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "a956f110be987c13019a4378542373d069c109b2a1eae11a4502ce2dfd39dc04"
+    },
+    {
+      "identidad": "tono suratman",
+      "foto": "Tono_Suratman_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "2fb470a03455c359cbcc780c860120511e21d40e4cd161e1da8bcc7ee2f69c7c"
+    },
+    {
+      "identidad": "john richardson",
+      "foto": "John_Richardson_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "d4373cd11b4c423afc6aa3b9bcda54ebd61878f3755830d5a8ebce87b84a578f"
+    },
+    {
+      "identidad": "chok tong goh",
+      "foto": "Chok_Tong_Goh_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "7603b74504bf13d43b312fc16c38a3ff182034f2ce96fa6a7befc823e20fcd48"
+    },
+    {
+      "identidad": "john dallager",
+      "foto": "John_Dallager_0001.jpg",
+      "causa": "deteccion_VARIOS_ROSTROS",
+      "sha256": "4531cfa12d82ea46cae01a5340a5efbaebd8a35178fd5b9c3bc30179870c52c7"
+    }
+  ],
+  "total_rechazados": 57,
+  "resumen_causas_rechazo": {
+    "Counter": [
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS",
+      "deteccion_VARIOS_ROSTROS"
+    ]
+  }
+}

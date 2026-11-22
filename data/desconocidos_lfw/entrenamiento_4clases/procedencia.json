@@ -1,0 +1,22 @@
+{
+  "dataset": "Labeled Faces in the Wild (LFW)",
+  "variante": "lfw_funneled",
+  "fuente_local": "C:\\Users\\Mayck\\scikit_learn_data\\lfw_home\\lfw_funneled",
+  "uso": "Entrenamiento de la clase 'desconocido' en experimento controlado de 4 clases.",
+  "semilla": "lfw_desconocidos_entrenamiento_4clases_v1",
+  "total_imagenes": 300,
+  "total_identidades": 300,
+  "manifiestos_historicos_excluidos": [
+    "data/desconocidos_lfw/calibracion/manifiesto.csv",
+    "data/desconocidos_lfw/reserva_prueba/manifiesto.csv",
+    "resultados/evaluacion_externa_lfw_cnn/manifiesto_lfw_100.csv"
+  ],
+  "inventario": {
+    "total_identidades": 5749,
+    "total_fotos": 13233,
+    "identidades_excluidas": 300,
+    "identidades_disponibles": 5449,
+    "fotos_disponibles": 12318
+  },
+  "dudosas_detectadas": 0
+}

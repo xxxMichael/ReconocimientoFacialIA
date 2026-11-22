@@ -1,0 +1,59 @@
+{
+  "fecha_utc": "2026-11-21T00:15:59.012236+00:00",
+  "directorio_origen": "C:\\Dev\\7-semestre\\AI2\\ReconocimientoFacialIA\\data\\recepcion_externa\\fotos_desc",
+  "semilla_permutacion": 20261120,
+  "total_declarado_usuario": 33,
+  "total_encontrado_real": 34,
+  "discrepancia_inventario": "Se encontraron 34 archivos PNG únicos y legibles (1 más de los 33 declarados, debido a la coexistencia de image.png, image copy.png e image copy 2..33.png). Se asignaron exactamente 18 a entrenamiento, 7 a validacion y 9 a prueba_reservada.",
+  "ilegibles": [],
+  "duplicados": [],
+  "conteos_particion": {
+    "entrenamiento": 18,
+    "validacion": 7,
+    "prueba_reservada": 9
+  },
+  "identificadores_por_particion": {
+    "entrenamiento": [
+      "universidad_001",
+      "universidad_002",
+      "universidad_003",
+      "universidad_006",
+      "universidad_009",
+      "universidad_014",
+      "universidad_017",
+      "universidad_019",
+      "universidad_020",
+      "universidad_021",
+      "universidad_022",
+      "universidad_024",
+      "universidad_025",
+      "universidad_026",
+      "universidad_028",
+      "universidad_031",
+      "universidad_033",
+      "universidad_034"
+    ],
+    "validacion": [
+      "universidad_004",
+      "universidad_005",
+      "universidad_007",
+      "universidad_008",
+      "universidad_012",
+      "universidad_015",
+      "universidad_016"
+    ],
+    "prueba_reservada": [
+      "universidad_010",
+      "universidad_011",
+      "universidad_013",
+      "universidad_018",
+      "universidad_023",
+      "universidad_027",
+      "universidad_029",
+      "universidad_030",
+      "universidad_032"
+    ]
+  },
+  "ruta_manifiesto": "C:\\Dev\\7-semestre\\AI2\\ReconocimientoFacialIA\\data\\universidad_desc\\manifiesto_universidad.csv",
+  "sha256_manifiesto": "f2b7ce90d2460a0177a27610a98424c7dceba33497ee89eaea9b6f2d52c0c8bf"
+}
