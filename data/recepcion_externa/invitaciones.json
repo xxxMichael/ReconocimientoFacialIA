@@ -1,0 +1,74 @@
+{
+  "2qowYI6xCa1GJa2leDvPIg": {
+    "token": "2qowYI6xCa1GJa2leDvPIg",
+    "identificador": "externo_piloto",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T21:42:46.981225+00:00",
+    "consentimiento_registrado": true,
+    "consentimiento_timestamp": "2026-11-20T21:43:07.074636+00:00",
+    "notas": ""
+  },
+  "dsEPsMAU-1q5evQl-3xMyA": {
+    "token": "dsEPsMAU-1q5evQl-3xMyA",
+    "identificador": "stevenl",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T22:03:07.196852+00:00",
+    "consentimiento_registrado": true,
+    "consentimiento_timestamp": "2026-11-20T22:05:14.823678+00:00",
+    "notas": ""
+  },
+  "p42lYVvkf0e8rEk8xzQTbw": {
+    "token": "p42lYVvkf0e8rEk8xzQTbw",
+    "identificador": "william",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T22:10:29.371834+00:00",
+    "consentimiento_registrado": false,
+    "consentimiento_timestamp": null,
+    "notas": ""
+  },
+  "ZGDH1CJx9MtPLSMNTnJ7LQ": {
+    "token": "ZGDH1CJx9MtPLSMNTnJ7LQ",
+    "identificador": "sonia",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T22:12:07.281667+00:00",
+    "consentimiento_registrado": true,
+    "consentimiento_timestamp": "2026-11-20T22:16:03.269274+00:00",
+    "notas": ""
+  },
+  "rlJ9ydai2PViqaUPJ-ppqA": {
+    "token": "rlJ9ydai2PViqaUPJ-ppqA",
+    "identificador": "david",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T22:19:37.602832+00:00",
+    "consentimiento_registrado": true,
+    "consentimiento_timestamp": "2026-11-20T22:47:45.167752+00:00",
+    "notas": ""
+  },
+  "vZ0bNCHJd7y9A5uFu0TSLQ": {
+    "token": "vZ0bNCHJd7y9A5uFu0TSLQ",
+    "identificador": "paul",
+    "tipo_sujeto": "desconocido",
+    "grupo": "desconocidos_prueba",
+    "particion": "prueba",
+    "activo": true,
+    "creado_en": "2026-11-20T22:21:53.506271+00:00",
+    "consentimiento_registrado": true,
+    "consentimiento_timestamp": "2026-11-20T22:25:00.843082+00:00",
+    "notas": ""
+  }
+}

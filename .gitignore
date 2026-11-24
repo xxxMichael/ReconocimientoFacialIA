@@ -36,9 +36,11 @@
 !/data/
 !/data/propio/
 !/data/propio/manifiesto.csv
-!/data/propio/imagenes/
+!/data/propio/manifiesto_local.csv
 !/data/propio/imagenes/
 !/data/propio/imagenes/**
+!/data/recepcion_externa/
+!/data/recepcion_externa/**
 !/data/desconocidos_lfw/
 !/data/desconocidos_lfw/**
 !/data/universidad_desc/
