@@ -1,0 +1,18 @@
+{
+  "persona_to_id": {
+    "persona_1": 0,
+    "persona_2": 1,
+    "persona_3": 2
+  },
+  "id_to_persona": {
+    "0": "persona_1",
+    "1": "persona_2",
+    "2": "persona_3"
+  },
+  "personas_autorizadas": [
+    "persona_1",
+    "persona_2",
+    "persona_3"
+  ],
+  "umbral_rechazo_recomendado": 0.65
+}

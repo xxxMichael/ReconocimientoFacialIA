@@ -1,0 +1,29 @@
+=== RESULTADOS DE EVALUACIÓN: CNN ===
+Dataset: propio
+Configuración: {'arquitectura': 'Conv(1->16, 3x3) -> BN -> ReLU -> Pool(2x2) [32x32] -> Conv(16->32, 3x3) -> BN -> ReLU -> Pool(2x2) [16x16] -> Conv(32->64, 3x3) -> BN -> ReLU -> Pool(2x2) [8x8] -> Flatten(4096) -> Linear(4096, 128) -> ReLU -> Drop(0.35) -> Linear(128, 40)', 'dimensiones_bloques': {'bloque1_salida': [16, 32, 32], 'bloque2_salida': [32, 16, 16], 'bloque3_salida': [64, 8, 8], 'clasificador_entrada': 4096, 'clasificador_oculta': 128, 'clasificador_salida': 40}, 'parametros_entrenables': 548323, 'optimizador': 'Adam', 'learning_rate': 0.0005, 'weight_decay': 0.0001, 'tamano_lote': 16, 'total_epocas': 80, 'mejor_epoca_seleccionada': 14, 'mejor_exactitud_val': 85.18518518518519, 'representacion': 'Espacial 2D directa (64x64 gris) - Representation Learning', 'semilla': 42, 'suavizado_sigma': 0.5, 'semilla_aleatoria': 42, 'estadisticas_deteccion': {'abajo': {'total': 30, 'exitos': 25, 'fallos': 5, 'sin_rostro': 5, 'varios_rostros': 0, 'no_archivo': 0}, 'arriba': {'total': 30, 'exitos': 28, 'fallos': 2, 'sin_rostro': 2, 'varios_rostros': 0, 'no_archivo': 0}, 'derecha': {'total': 30, 'exitos': 26, 'fallos': 4, 'sin_rostro': 4, 'varios_rostros': 0, 'no_archivo': 0}, 'frontal': {'total': 30, 'exitos': 28, 'fallos': 2, 'sin_rostro': 2, 'varios_rostros': 0, 'no_archivo': 0}, 'izquierda': {'total': 30, 'exitos': 26, 'fallos': 4, 'sin_rostro': 4, 'varios_rostros': 0, 'no_archivo': 0}}, 'personas': ['persona_1', 'persona_2', 'persona_3'], 'umbral_rechazo_desconocido': 0.65}
+
+--- Partición: ENTRENAMIENTO ---
+  Total muestras:  85
+  Aciertos:        85
+  Errores:         0
+  Exactitud:       100.00%
+  Tasa de error:   0.00%
+  Tiempo inferencia: 0.403 ms/muestra
+
+--- Partición: VALIDACION ---
+  Total muestras:  27
+  Aciertos:        23
+  Errores:         4
+  Exactitud:       85.19%
+  Tasa de error:   14.81%
+  Tiempo inferencia: 0.382 ms/muestra
+
+--- Partición: PRUEBA ---
+  Total muestras:  21
+  Aciertos:        10
+  Errores:         11
+  Exactitud:       47.62%
+  Tasa de error:   52.38%
+  Tiempo inferencia: 0.610 ms/muestra
+
+Brecha de generalización (Train - Test): 52.38 p.p.

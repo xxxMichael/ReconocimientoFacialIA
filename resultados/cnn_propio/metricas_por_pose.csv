@@ -1,0 +1,6 @@
+pose,total_prueba,rostros_detectados,aciertos_knn,exactitud_knn_pct,exactitud_modelo_pct,exactitud_end_to_end_pct
+abajo,6,3,2,66.67,66.67,33.33
+arriba,6,5,3,60.0,60.0,50.0
+derecha,6,4,1,25.0,25.0,16.67
+frontal,6,5,3,60.0,60.0,50.0
+izquierda,6,4,1,25.0,25.0,16.67

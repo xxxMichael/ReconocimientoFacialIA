@@ -1,0 +1,84 @@
+{
+  "modelo_elegido": "cnn",
+  "algoritmo": "cnn",
+  "directorio_modelo": "resultados/cnn_propio",
+  "umbral_recomendado": 0.65,
+  "calibracion_completa": true,
+  "total_modelos_calibrados": 5,
+  "exactitud_validacion_pct": 85.19,
+  "exactitud_prueba_pct": 47.62,
+  "empate_en_validacion": true,
+  "modelos_empatados_validacion": [
+    "cnn",
+    "ann"
+  ],
+  "criterio_seleccion": "Selecci\u00f3n basada estrictamente en VALIDACI\u00d3N (sin consultar conjunto de prueba). Existe empate en exactitud de validaci\u00f3n (85.19%) entre ['cnn', 'ann']. El desempate se resuelve por el objetivo de la puerta f\u00edsica: 1) Modelo con calibraci\u00f3n v\u00e1lida en validaci\u00f3n, 2) Menor aceptaci\u00f3n f\u00edsica de desconocidos en validaci\u00f3n (FAR_val=80.0%), 3) Menor bloqueo f\u00edsico de autorizados en validaci\u00f3n (FRR_puerta_val=16.67%), y 4) Capacidad de representaci\u00f3n convolucional end-to-end sobre la cuadr\u00edcula 64x64.",
+  "ranking_validacion": [
+    {
+      "modelo": "cnn",
+      "directorio": "resultados/cnn_propio",
+      "val_acc": 85.19,
+      "calibrado": true,
+      "calibracion_completa": true,
+      "pendiente_calibrar": false,
+      "far_val_pct": 80.0,
+      "frr_val_pct": 16.67,
+      "train_acc": 100.0,
+      "brecha_train_val": 14.81,
+      "umbral_calibrado": 0.65
+    },
+    {
+      "modelo": "ann",
+      "directorio": "resultados/ann_propio",
+      "val_acc": 85.19,
+      "calibrado": true,
+      "calibracion_completa": true,
+      "pendiente_calibrar": false,
+      "far_val_pct": 90.0,
+      "frr_val_pct": 23.33,
+      "train_acc": 100.0,
+      "brecha_train_val": 14.81,
+      "umbral_calibrado": 0.6
+    },
+    {
+      "modelo": "arbol",
+      "directorio": "resultados/arbol_propio",
+      "val_acc": 74.07,
+      "calibrado": true,
+      "calibracion_completa": true,
+      "pendiente_calibrar": false,
+      "far_val_pct": 100.0,
+      "frr_val_pct": 10.0,
+      "train_acc": 100.0,
+      "brecha_train_val": 25.93,
+      "umbral_calibrado": 0.99
+    },
+    {
+      "modelo": "knn",
+      "directorio": "resultados/knn_propio",
+      "val_acc": 44.44,
+      "calibrado": true,
+      "calibracion_completa": true,
+      "pendiente_calibrar": false,
+      "far_val_pct": 100.0,
+      "frr_val_pct": 26.67,
+      "train_acc": 90.59,
+      "brecha_train_val": 46.15,
+      "umbral_calibrado": 0.6
+    },
+    {
+      "modelo": "svm",
+      "directorio": "resultados/svm_propio",
+      "val_acc": 25.93,
+      "calibrado": true,
+      "calibracion_completa": true,
+      "pendiente_calibrar": false,
+      "far_val_pct": 40.0,
+      "frr_val_pct": 10.0,
+      "train_acc": 100.0,
+      "brecha_train_val": 74.07,
+      "umbral_calibrado": 0.99
+    }
+  ],
+  "fecha_seleccion": "2026-11-16T10:45:48.182096"
+}
