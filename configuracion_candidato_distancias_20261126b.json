@@ -1,0 +1,73 @@
+{
+  "candidato": {
+    "identificador": "cnn_4clases_distancias_20261126b",
+    "nombre": "CNN 4 Clases + Distancias (26-nov, 2) - 0.93",
+    "tipo_arquitectura": "CNN",
+    "ruta_modelo": "resultados/exp_4clases_portal_completo_20261126_062619/cnn/modelo.pt",
+    "sha256_modelo": "06782220d5853b847b7a4b625d875f92db03d9c8297111e85de269552f6332da",
+    "umbral_score": 0.93,
+    "orden_clases": [
+      "persona_1",
+      "persona_2",
+      "persona_3",
+      "desconocido"
+    ],
+    "mapeo_clases": {
+      "0": "persona_1",
+      "1": "persona_2",
+      "2": "persona_3",
+      "3": "desconocido"
+    },
+    "personas_autorizadas": [
+      "persona_1",
+      "persona_2",
+      "persona_3"
+    ],
+    "fecha_propuesta": "2026-11-26T06:31:09.867940",
+    "estado": "experimental_sin_prueba_independiente"
+  },
+  "detector_facial": {
+    "tipo": "YuNet",
+    "ruta_modelo": "modelos/detector/face_detection_yunet_2023mar.onnx",
+    "sha256_modelo": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "parametros": {
+      "score_threshold": 0.6,
+      "nms_threshold": 0.3,
+      "margen_expansion": 0.1,
+      "modo_multiorientacion": "cascada",
+      "orientaciones_soportadas": [
+        0,
+        90,
+        180,
+        270
+      ]
+    }
+  },
+  "preprocesamiento": {
+    "metodo": "alineacion_5puntos",
+    "plantilla_canonica": "PLANTILLA_FACIAL_64x64",
+    "resolucion": [
+      64,
+      64
+    ],
+    "interpolacion": "INTER_AREA_o_LINEAR",
+    "borde": "BORDER_REFLECT_101",
+    "transformacion": "similitud_2d_sin_reflejo",
+    "normalizacion_intensidad": "float32_0_1",
+    "suavizado_gaussiano": {
+      "sigma": 0.5,
+      "kernel": "automatico"
+    },
+    "metodo_remuestreo": "estandar",
+    "parametros_remuestreo": {
+      "metodo": "estandar",
+      "nota": "cv2.warpAffine directo a 64x64 (INTER_AREA cuando escala < 0.9, INTER_LINEAR si >= 0.9) + gaussiano posterior sigma=0.5"
+    }
+  },
+  "regla_acceso": {
+    "tipo": "regla_canonica_completa",
+    "restriccion_frr_persona_max": 0.3,
+    "decision_puerta_desconocido": "CERRADA_ESTRICTA",
+    "criterio_apertura": "score >= umbral_score AND clase_predicha IN personas_autorizadas AND deteccion == 'UN_ROSTRO'"
+  }
+}

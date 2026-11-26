@@ -71,3 +71,15 @@ __pycache__/
 !/imagenes/
 !/imagenes/*.png
 !/referencias.bib
+!/resultados/exp_4clases_portal_completo_20261125_135007/
+!/resultados/exp_4clases_portal_completo_20261125_135007/cnn/
+!/resultados/exp_4clases_portal_completo_20261125_135007/cnn/modelo.pt
+!/resultados/exp_4clases_portal_completo_20261126_055436/
+!/resultados/exp_4clases_portal_completo_20261126_055436/cnn/
+!/resultados/exp_4clases_portal_completo_20261126_055436/cnn/modelo.pt
+!/resultados/exp_4clases_portal_completo_20261126_062619/
+!/resultados/exp_4clases_portal_completo_20261126_062619/cnn/
+!/resultados/exp_4clases_portal_completo_20261126_062619/cnn/modelo.pt
+!/resultados/exp_4clases_portal_completo_20261126_072345/
+!/resultados/exp_4clases_portal_completo_20261126_072345/cnn/
+!/resultados/exp_4clases_portal_completo_20261126_072345/cnn/modelo.pt
