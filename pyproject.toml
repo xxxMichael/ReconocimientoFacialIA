@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 redes = ["torch>=2"]
+hardware = ["pyserial"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

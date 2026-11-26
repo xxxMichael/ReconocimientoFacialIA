@@ -22,8 +22,15 @@ from reconocimiento.adquisicion.propio import (
 from reconocimiento.web.streamer import GestorCamaraWeb, calcular_progreso_sesion
 
 
-def crear_app(indice_inicial: int = 1, ruta_config_candidato: Optional[Path] = None) -> Flask:
-    """Crea y configura la aplicación Flask para la interfaz web de adquisición y acceso."""
+def crear_app(
+    indice_inicial: int = 1,
+    ruta_config_candidato: Optional[Path] = None,
+    indicador_leds: Optional[object] = None,
+) -> Flask:
+    """
+    Crea y configura la aplicación Flask para la interfaz web de adquisición y acceso.
+    indicador_leds: indicador opcional de LED (Arduino) que refleja a quién se le abre la puerta.
+    """
     directorio_base = Path(__file__).parent
     app = Flask(
         __name__,
@@ -34,6 +41,9 @@ def crear_app(indice_inicial: int = 1, ruta_config_candidato: Optional[Path] = N
 
     gestor = GestorCamaraWeb()
     app.config["GESTOR_CAMARA"] = gestor
+    gestor.indicador_leds = indicador_leds
+    if indicador_leds is not None:
+        atexit.register(indicador_leds.cerrar)
 
     modelo_cargado_exitosamente = False
 
@@ -104,18 +114,38 @@ def crear_app(indice_inicial: int = 1, ruta_config_candidato: Optional[Path] = N
     @app.route("/api/camaras", methods=["GET"])
     def api_camaras():
         max_idx = request.args.get("max_indices", default=5, type=int)
-        dispositivos = sondear_camaras(max_indices=max_idx)
-        return jsonify({"dispositivos": dispositivos})
+        # No reabrir la cámara que la web ya está usando: abrir/liberar un dispositivo
+        # DirectShow activo corta su flujo y deja el video congelado.
+        omitir = {}
+        estado = gestor.obtener_estado()
+        if estado.get("activa") and estado.get("indice") is not None:
+            ancho, alto = 0, 0
+            try:
+                ancho, alto = gestor.capturador.obtener_dimensiones()
+            except Exception:
+                pass
+            omitir[int(estado["indice"])] = (ancho, alto)
+        dispositivos = sondear_camaras(max_indices=max_idx, omitir=omitir)
+        return jsonify({"dispositivos": dispositivos, "indice_activo": estado.get("indice")})
 
     @app.route("/api/camara/iniciar", methods=["POST"])
     def api_camara_iniciar():
         data = request.get_json(silent=True) or {}
         indice = int(data.get("indice", 1))
+        indice_previo = gestor.indice_activo
         try:
             gestor.iniciar(indice=indice)
             return jsonify({"status": "ok", "mensaje": f"Cámara en índice {indice} iniciada."})
         except Exception as e:
-            return jsonify({"status": "error", "mensaje": str(e)}), 500
+            mensaje = str(e)
+            # Si el cambio falla, recuperar la cámara que funcionaba para no quedar sin video
+            if indice_previo is not None and indice_previo != indice:
+                try:
+                    gestor.iniciar(indice=indice_previo)
+                    mensaje += f" Se mantiene la cámara {indice_previo}."
+                except Exception:
+                    pass
+            return jsonify({"status": "error", "mensaje": mensaje}), 500
 
     @app.route("/api/camara/detener", methods=["POST"])
     def api_camara_detener():

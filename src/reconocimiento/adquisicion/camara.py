@@ -41,13 +41,35 @@ def sanitizar_componente_ruta(valor: str) -> str:
     return texto
 
 
-def sondear_camaras(max_indices: int = 5, backend: int = cv2.CAP_DSHOW) -> List[Dict[str, Any]]:
+def sondear_camaras(
+    max_indices: int = 5,
+    backend: int = cv2.CAP_DSHOW,
+    omitir: Optional[Dict[int, Tuple[int, int]]] = None,
+) -> List[Dict[str, Any]]:
     """
     Sondea un rango pequeño de índices de video usando DirectShow (Windows),
     obtiene dimensiones reales y backend, y libera inmediatamente cada dispositivo.
+
+    `omitir` mapea índices en uso (ya abiertos por la aplicación) a su (ancho, alto):
+    no se vuelven a abrir, porque abrir y liberar un dispositivo activo corta su flujo.
     """
+    omitir = omitir or {}
     dispositivos = []
     for idx in range(max_indices):
+        if idx in omitir:
+            ancho_o, alto_o = omitir[idx]
+            dispositivos.append({
+                "indice": idx,
+                "backend": "CAP_DSHOW (DirectShow)",
+                "disponible": True,
+                "abierto": True,
+                "en_uso": True,
+                "ancho": ancho_o,
+                "alto": alto_o,
+                "canales": 3,
+                "fps_nominal": 30.0
+            })
+            continue
         cap = cv2.VideoCapture(idx, backend)
         abierto = cap.isOpened()
         if abierto:

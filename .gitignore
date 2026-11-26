@@ -66,3 +66,5 @@
 !/resultados/desarrollo_4clases_corregido_20261119_123602/cnn/modelo.pt
 __pycache__/
 *.egg-info/
+!/arduino/
+!/arduino/**

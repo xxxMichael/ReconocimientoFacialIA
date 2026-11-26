@@ -21,12 +21,14 @@ def main() -> int:
     parser.add_argument("--servidor", type=str, default="waitress", choices=["waitress", "flask"], help="Servidor WSGI")
     args = parser.parse_args()
 
+    from reconocimiento.hardware.indicador_arduino import crear_indicador_auto
     iniciar_servidor_portal_reconocimiento(
         host=args.host,
         puerto=args.puerto,
         hilos=args.hilos,
         modo_servidor=args.servidor,
         raiz_proyecto=RAIZ,
+        indicador_leds=crear_indicador_auto(),
     )
     return 0
 

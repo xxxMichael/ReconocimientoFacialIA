@@ -58,7 +58,10 @@ class ServicioPortalReconocimiento:
         raiz_proyecto: Optional[Path] = None,
         ruta_registro_intentos: Optional[Path] = None,
         max_inferencias_simultaneas: int = 4,
+        indicador_leds: Optional[Any] = None,
     ) -> None:
+        # Indicador opcional de LED (Arduino): refleja a quién se le abre la puerta
+        self.indicador_leds = indicador_leds
         self.raiz = Path(raiz_proyecto) if raiz_proyecto else Path.cwd()
         self.ruta_registro_intentos = (
             Path(ruta_registro_intentos)
@@ -140,6 +143,11 @@ class ServicioPortalReconocimiento:
             lock = self.locks_candidato[candidato_id]
             with lock:
                 res_det, dec, probs = pipe.evaluar_fotograma_completo(frame_bgr)
+
+            if self.indicador_leds is not None:
+                self.indicador_leds.actualizar(
+                    dec.persona_identificada if (dec.estado_puerta == "ABIERTA" and dec.es_autorizado) else None
+                )
 
             latencia_ms = round((time.perf_counter() - t0) * 1000.0, 2)
             clase_predicha = None

@@ -955,15 +955,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const resp = await fetch("/api/camaras?max_indices=5");
       const data = await resp.json();
       selectCamara.innerHTML = "";
-      if (!data.dispositivos || data.dispositivos.length === 0) {
+      // Solo cámaras que realmente entregan imagen
+      const utiles = (data.dispositivos || []).filter(d => d.disponible);
+      if (utiles.length === 0) {
         selectCamara.innerHTML = `<option value="-1">No se detectaron cámaras</option>`;
         return;
       }
-      data.dispositivos.forEach(d => {
+      utiles.forEach(d => {
         const opt = document.createElement("option");
         opt.value = d.indice;
-        opt.textContent = `Cámara ${d.indice}: ${d.resolucion} (${d.backend})`;
-        if (d.disponible) opt.selected = true;
+        const res = d.ancho && d.alto ? `${d.ancho}x${d.alto}` : "sin resolución";
+        opt.textContent = `Cámara ${d.indice}: ${res}${d.en_uso ? " (en uso)" : ""}`;
+        if (d.indice === data.indice_activo) opt.selected = true;
         selectCamara.appendChild(opt);
       });
     } catch (err) {

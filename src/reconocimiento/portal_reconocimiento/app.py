@@ -19,6 +19,7 @@ def crear_portal_reconocimiento_app(
     raiz_proyecto: Optional[Path] = None,
     ruta_registro_intentos: Optional[Path] = None,
     max_inferencias_simultaneas: int = 4,
+    indicador_leds: Optional[object] = None,
 ) -> Flask:
     """Crea la aplicación Flask aislada para reconocimiento remoto."""
     dir_base = Path(__file__).parent
@@ -33,6 +34,7 @@ def crear_portal_reconocimiento_app(
         raiz_proyecto=raiz_proyecto,
         ruta_registro_intentos=ruta_registro_intentos,
         max_inferencias_simultaneas=max_inferencias_simultaneas,
+        indicador_leds=indicador_leds,
     )
     app.config["SERVICIO_PORTAL_RECONOCIMIENTO"] = servicio
 

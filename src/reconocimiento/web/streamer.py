@@ -141,6 +141,8 @@ class GestorCamaraWeb:
         self.nombre_modelo_activo: str = "ninguno"
         self.es_cnn: bool = False
         self.umbral_confianza: float = 0.65
+        # Indicador opcional de LED (Arduino). None = sin hardware conectado.
+        self.indicador_leds: Optional[Any] = None
         self.ultimo_resultado_reconocimiento: Dict[str, Any] = {
             "estado_puerta": "CERRADA",
             "persona_reconocida": "DESCONOCIDO",
@@ -552,6 +554,10 @@ class GestorCamaraWeb:
                 "umbral": round(umbral_snap * 100, 1)
             }
 
+        # LED del Arduino: solo se enciende el de la persona autorizada cuya puerta está ABIERTA
+        if self.indicador_leds is not None:
+            self.indicador_leds.actualizar(persona_rec if (estado_puerta == "ABIERTA" and es_aut) else None)
+
         # 3. Dibujar visualización con HUD y estado de Puerta
         display = frame_raw.copy()
         if resultado_det.estado == EstadoDeteccion.UN_ROSTRO and resultado_det.recuadro is not None:
@@ -668,6 +674,8 @@ class GestorCamaraWeb:
                 ultimo.confianza = 0.0
                 ultimo.mensaje_acceso = razon
             self.condicion_fotograma.notify_all()
+        if self.indicador_leds is not None:
+            self.indicador_leds.apagar()
 
     def _detener_sin_lock(self) -> None:
         """Detiene y libera recursos (debe llamarse con control de hilo)."""

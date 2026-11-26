@@ -1305,7 +1305,11 @@ def comando_web(args: argparse.Namespace) -> int:
         if ruta_default_std.exists():
             config_candidato = str(ruta_default_std)
 
-    app = crear_app(indice_inicial=indice, ruta_config_candidato=config_candidato)
+    # LED del Arduino (opcional): si no hay placa conectada, el sistema sigue sin ellos
+    from reconocimiento.hardware.indicador_arduino import crear_indicador_auto
+    indicador_leds = crear_indicador_auto()
+
+    app = crear_app(indice_inicial=indice, ruta_config_candidato=config_candidato, indicador_leds=indicador_leds)
 
     url_local = f"http://{host}:{port}/"
     print("\n=======================================================")
@@ -1354,8 +1358,13 @@ def comando_portal_reconocimiento(args: argparse.Namespace) -> int:
     puerto = getattr(args, "port", 5002)
     hilos = getattr(args, "hilos", 4)
     servidor = getattr(args, "servidor", "waitress")
+    # LED del Arduino (opcional): si no hay placa conectada, el portal sigue sin ellos
+    from reconocimiento.hardware.indicador_arduino import crear_indicador_auto
+    indicador_leds = crear_indicador_auto()
     try:
-        iniciar_servidor_portal_reconocimiento(host=host, puerto=puerto, hilos=hilos, modo_servidor=servidor)
+        iniciar_servidor_portal_reconocimiento(
+            host=host, puerto=puerto, hilos=hilos, modo_servidor=servidor, indicador_leds=indicador_leds
+        )
         return 0
     except KeyboardInterrupt:
         print("\nPortal de reconocimiento remoto detenido por el usuario.")
