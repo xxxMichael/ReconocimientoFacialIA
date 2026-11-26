@@ -1,49 +1,225 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass{article}
 
+% =========================================================
+% CONFIGURACIÓN GENERAL Y MÁRGENES
+% =========================================================
+
+\usepackage[
+    letterpaper,
+    top=2cm,
+    bottom=3cm,
+    left=3cm,
+    right=3cm,
+    marginparwidth=1.75cm
+]{geometry}
+
+\usepackage[spanish, es-tabla]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[spanish,es-tabla]{babel}
-\usepackage{amsmath,amssymb,amsfonts}
+
+% =========================================================
+% PAQUETES MATEMÁTICOS Y GRÁFICOS
+% =========================================================
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{longtable}
-\usepackage{graphicx}
-\usepackage{geometry}
-\usepackage{hyperref}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
 
 \setlength{\emergencystretch}{3em}
 
-\geometry{
-    a4paper,
-    left=2.5cm,
-    right=2.5cm,
-    top=2.5cm,
-    bottom=2.5cm
-}
+% =========================================================
+% CONFIGURACIÓN DE LISTINGS (CÓDIGO)
+% =========================================================
 
-\hypersetup{
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.96,0.96,0.96}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4
+}
+\lstset{style=mystyle}
+
+% =========================================================
+% REFERENCIAS BIBLIOGRÁFICAS (BIBLATEX - IEEE)
+% =========================================================
+
+\usepackage[
+    backend=biber,
+    style=ieee,
+    sorting=none
+]{biblatex}
+
+\addbibresource{referencias.bib}
+
+% =========================================================
+% HIPERVÍNCULOS
+% =========================================================
+
+\usepackage[
     colorlinks=true,
-    linkcolor=black,
-    urlcolor=black,
-    citecolor=black
+    allcolors=blue
+]{hyperref}
+
+% =========================================================
+% ENCABEZADO Y PIE DE PÁGINA INSTITUCIONAL (UTA - FISEI)
+% =========================================================
+
+\pagestyle{fancy}
+\fancyhf{}
+
+\setlength{\headheight}{70pt}
+
+\fancyhead[C]{%
+    \begin{minipage}[c]{2.5cm}
+        \centering
+        \includegraphics[width=2.2cm]{imagenes/uta.png}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[c]{8cm}
+        \centering
+        \small{\textbf{UNIVERSIDAD TÉCNICA DE AMBATO}}\\[0.1cm]
+        \scriptsize{\textit{FACULTAD DE INGENIERÍA EN SISTEMAS, ELECTRÓNICA E INDUSTRIAL}}\\[0.1cm]
+        \scriptsize{\textbf{CARRERA DE SOFTWARE}}\\[0.1cm]
+        \scriptsize{\textbf{CICLO ACADÉMICO: OCTUBRE 2026 -- MARZO 2027}}
+    \end{minipage}%
+    \hfill
+    \begin{minipage}[c]{2.5cm}
+        \centering
+        \includegraphics[width=2.2cm]{imagenes/fisei.png}
+    \end{minipage}%
 }
 
-\title{\textbf{Diseño, Implementación y Evaluación Experimental de un Sistema de Reconocimiento Facial en Conjunto Abierto para Control de Acceso Simulado Basado en Visión por Computador y Aprendizaje Automático}}
-\author{Proyecto Académico de Inteligencia Artificial II \\ Séptimo Semestre --- Ingeniería en Sistemas / Computación}
-\date{21 de noviembre de 2026}
+\fancyfoot[C]{\thepage}
+
+% =========================================================
+% DOCUMENTO PRINCIPAL
+% =========================================================
 
 \begin{document}
 
-\maketitle
+% =========================================================
+% PORTADA
+% =========================================================
+
+\begin{titlepage}
+
+    \thispagestyle{empty}
+
+    \begin{center}
+
+        \vspace*{0.5cm}
+
+        \includegraphics[width=4cm]{imagenes/uta.png}
+
+        \vspace{0.7cm}
+
+        {\Large \textbf{UNIVERSIDAD TÉCNICA DE AMBATO}}
+
+        \vspace{0.35cm}
+
+        {\large
+        FACULTAD DE INGENIERÍA EN SISTEMAS,\\
+        ELECTRÓNICA E INDUSTRIAL}
+
+        \vspace{0.35cm}
+
+        {\large \textbf{CARRERA DE SOFTWARE}}
+
+        {\large
+        \vspace{1.2cm}
+        \textbf{Tema:}\\
+        Diseño, Implementación y Evaluación Experimental de un Sistema de Reconocimiento Facial en Conjunto Abierto para Control de Acceso Simulado Basado en Visión por Computador y Aprendizaje Automático
+
+        \vspace{0.4cm}
+
+        \textbf{Unidad de Organización Curricular:}\\
+        Profesional
+
+        \vspace{0.4cm}
+
+        \textbf{Nivel y Paralelo:}\\
+        7mo -- A
+
+        \vspace{0.4cm}
+
+        \textbf{Asignatura:}\\
+        Inteligencia Artificial II
+
+        \vspace{0.4cm}
+
+        \textbf{Docente:}\\
+        Ing. Mg. Ruben Nogales
+
+        \vspace{0.4cm}
+
+        \textbf{Alumnos participantes:}\\
+        Toala Steeven\\
+        Chavez Michael
+
+        }
+
+        \vfill
+
+        {\large
+        Ambato -- Ecuador\\
+        Noviembre de 2026
+        }
+
+    \end{center}
+
+\end{titlepage}
+
+% =========================================================
+% ÍNDICES (ROMANOS)
+% =========================================================
+
+\pagenumbering{roman}
+
+\tableofcontents
+\newpage
+
+\listoffigures
+\listoftables
+\newpage
+
+\pagenumbering{arabic}
 
 \begin{abstract}
 El presente informe documenta de manera rigurosa el desarrollo integral de un sistema de reconocimiento facial e identificación biométrica en conjunto abierto (\textit{open-set}) orientado a la simulación de control de acceso físico (apertura y bloqueo de puerta). El proyecto se estructura estrictamente bajo un flujo de trabajo (\textit{pipeline}) de aprendizaje automático de cuatro fases: (1) adquisición y obtención de datos, (2) preprocesamiento espacial de imagen, (3) extracción de características y (4) clasificación supervisada acoplada a una regla determinista de decisión de acceso, excluyendo por diseño cualquier etapa de postprocesamiento. En la fase de preprocesamiento se establece una separación funcional estricta entre la localización facial y la identificación: la red neuronal profunda ligera YuNet (\texttt{face\_detection\_yunet\_2023mar.onnx}) se utiliza única y exclusivamente para ubicar el recuadro delimitador del rostro y sus cinco puntos anatómicos de referencia bajo una estrategia multi-orientación en cascada ($0^\circ, 90^\circ, 270^\circ, 180^\circ$), sin intervenir jamás en la predicción de identidad. A partir de dichos puntos se aplica una transformación geométrica de similitud bidimensional sin reflejo hacia una plantilla canónica de $64 \times 64$ píxeles, seguida de conversión a luminancia en escala de grises, normalización radiométrica y filtrado espacial mediante convolución discreta bidimensional con máscaras (incluyendo suavizado pasa-bajos gaussiano con $\sigma = 0.5$ y máscara $5 \times 5$, análisis de filtros espaciales de acentuado pasa-altos con máscara $3 \times 3$ de suma nula, filtro de énfasis de altas frecuencias \textit{High-Boost}, generación de máscaras binarias mediante el método de Otsu con segmentación por componentes conexos de 8 vecinos, sobremuestreo antialiasing basado en el criterio de Nyquist y compuerta de calidad por gradiente espacial). En las fases de extracción y clasificación se formulan, entrenan y comparan experimentalmente cinco algoritmos supervisados obligatorios: K-Vecinos Más Cercanos (KNN), Árbol de Decisión (CART con entropía de Shannon), Máquina de Vectores de Soporte (SVM), Red Neuronal Artificial Densa (ANN/MLP) sobre descriptores de histogramas regionales concatenados ($\mathbb{R}^{256}$), y una Red Neuronal Convolucional (CNN) propia entrenada de extremo a extremo sobre tensores de imagen ($[0,1]^{1 \times 64 \times 64}$). Mediante un esquema de balanceo jerárquico en dos niveles sobre $1,221$ muestras de entrenamiento, la CNN alcanza el desempeño superior en validación automática ($\text{FRR}_{\text{puerta}} = 1.56\%$, $63/64$ identificaciones correctas, $0$ confusiones y $\text{FAR}_{\text{global}} = 0.00\%$ en $107$ intentos de desconocidos con umbral calibrado $\tau = 0.61$), siendo seleccionada como el clasificador activo en producción tanto en la interfaz local como en el portal independiente de reconocimiento remoto.
+ Como extensión final se incorporan un diagnóstico cuantitativo que atribuye los fallos de \texttt{persona\_3} a la cobertura de condiciones de captura y no a sobreajuste clásico, un reentrenamiento con las sesiones de distancia, y un indicador físico de acceso con Arduino Uno que enciende un LED distinto por persona autorizada tanto en la interfaz local como en el portal remoto.
 \end{abstract}
 
 \textbf{Palabras clave:} Reconocimiento facial, conjunto abierto, convolución espacial, filtros de acentuado, máscaras de filtrado, detección facial YuNet, alineación por similitud 2D, redes neuronales convolucionales, calibración de umbral, control de acceso.
 
-\newpage
-\tableofcontents
 \newpage
 
 % ==============================================================================
@@ -119,7 +295,7 @@ Para garantizar que la evaluación mida generalización real entre sesiones de c
 \subsection{Fuentes de Sujetos Desconocidos y Aislamiento por Identidad}
 Para modelar la clase \texttt{desconocido} con diversidad demográfica, óptica y geométrica, se integraron tres fuentes disjuntas por identidad:
 \begin{enumerate}
-    \item \textbf{Labeled Faces in the Wild (LFW):} Se seleccionaron identidades con separación estricta entre particiones: $300$ identidades únicas ($1$ imagen por persona) para entrenamiento, $100$ identidades para validación/calibración de umbral y $100$ identidades adicionales como reserva histórica.
+    \item \textbf{Labeled Faces in the Wild (LFW)~\cite{huang2007lfw}:} Se seleccionaron identidades con separación estricta entre particiones: $300$ identidades únicas ($1$ imagen por persona) para entrenamiento, $100$ identidades para validación/calibración de umbral y $100$ identidades adicionales como reserva histórica.
     \item \textbf{Portal Web de Captura Externa ($75$ imágenes de $5$ voluntarios):} Se desarrolló un portal de recopilación independiente donde cinco voluntarios externos reales (\texttt{david}, \texttt{externo\_piloto}, \texttt{paul}, \texttt{sonia} y \texttt{stevenl}) capturaron $15$ fotografías cada uno combinando las $5$ poses con $3$ distancias (\texttt{cercana}, \texttt{media} y \texttt{lejana}) desde sus propios dispositivos. De las $75$ fotografías, YuNet localizó un rostro válido en $72$ imágenes, las cuales se incorporaron al entrenamiento de la iteración de cobertura completa. Las $3$ imágenes restantes de \texttt{externo\_piloto} (\texttt{abajo\_cercana}, \texttt{arriba\_media} y \texttt{derecha\_lejana}) presentaron fallo de detección y se excluyeron limpiamente sin inventar recortes manuales.
     \item \textbf{Archivo Fotográfico Universitario ($34$ imágenes de alta resolución):} Conjunto de $34$ fotografías PNG únicas de estudiantes universitarios (con permiso declarado y una persona por imagen), particionado de forma determinista (semilla $20261120$) en $18$ identidades de entrenamiento, $7$ de validación y $9$ de prueba reservada independiente. En las $18$ de entrenamiento, YuNet detectó $15$ rostros válidos (a cada uno se le aplicaron $2$ aumentos para compensar su menor volumen frente a LFW, aportando $45$ muestras) y omitió $3$ por fallo de detección.
 \end{enumerate}
@@ -156,7 +332,7 @@ Clase & Fuente & Orig. & Aum. & Total & Ident. & Peso total & Peso / muestra & P
 % ==============================================================================
 
 \subsection{Ubicación Facial Multi-orientación con YuNet y Alineación de Similitud 2D}
-Las fotografías provenientes de cámaras móviles y archivos externos suelen presentar rotaciones de captura de $90^\circ, 180^\circ$ o $270^\circ$ respecto al eje vertical, además de inclinaciones del rostro en el plano (\textit{roll}). Para resolverlo sin confundir rotación de cámara con perfiles anatómicos, el módulo \texttt{DetectorYuNet} evalúa el modelo ONNX (\texttt{score\_threshold} $= 0.6$, \texttt{nms\_threshold} $= 0.3$) bajo una estrategia en cascada sobre las cuatro orientaciones ortogonales $\{0^\circ, 90^\circ, 270^\circ, 180^\circ\}$. Si a $0^\circ$ se localiza un rostro con confianza $\ge 0.72$, se acepta directamente; en caso contrario, se exploran las rotaciones restantes, se proyectan las coordenadas detectadas de vuelta al sistema de referencia del fotograma original y se fusionan detecciones redundantes mediante el criterio de solapamiento $\max(\text{IoU}, \text{IoMin}) \ge 0.45$.
+Las fotografías provenientes de cámaras móviles y archivos externos suelen presentar rotaciones de captura de $90^\circ, 180^\circ$ o $270^\circ$ respecto al eje vertical, además de inclinaciones del rostro en el plano (\textit{roll}). Para resolverlo sin confundir rotación de cámara con perfiles anatómicos, el módulo \texttt{DetectorYuNet}~\cite{wu2023yunet} evalúa el modelo ONNX (\texttt{score\_threshold} $= 0.6$, \texttt{nms\_threshold} $= 0.3$) bajo una estrategia en cascada sobre las cuatro orientaciones ortogonales $\{0^\circ, 90^\circ, 270^\circ, 180^\circ\}$. Si a $0^\circ$ se localiza un rostro con confianza $\ge 0.72$, se acepta directamente; en caso contrario, se exploran las rotaciones restantes, se proyectan las coordenadas detectadas de vuelta al sistema de referencia del fotograma original y se fusionan detecciones redundantes mediante el criterio de solapamiento $\max(\text{IoU}, \text{IoMin}) \ge 0.45$.
 
 Cuando YuNet reporta exactamente \texttt{UN\_ROSTRO}, entrega el recuadro delimitador y cinco puntos anatómicos faciales $\mathcal{P} = \{\mathbf{p}_i\}_{i=0}^4 \subset \mathbb{R}^2$ (ojo derecho, ojo izquierdo, punta de la nariz, comisura labial derecha y comisura labial izquierda). Exigiendo una distancia interpupilar mínima $\|\mathbf{p}_1 - \mathbf{p}_0\|_2 \ge 4.0\;\text{px}$, dichos puntos se alinean hacia la plantilla canónica fija $\mathcal{Q} = \{\mathbf{q}_i\}_{i=0}^4$ definida en la resolución $64 \times 64$:
 \begin{equation}
@@ -194,7 +370,7 @@ g(x, y) = \frac{1}{Z} \sum_{s=-a}^{a} \sum_{t=-b}^{b} w(s, t)\, f(x + s, y + t),
 donde $g(x,y)$ es la respuesta filtrada y $Z$ es la constante de normalización ($Z = \sum_{s,t} w(s,t)$ en filtros pasa-bajos para conservar el nivel medio de luminancia, y $Z = 1$ en máscaras diferenciales o de acentuado cuya suma de coeficientes es cero).
 
 \subsection{Filtro Gaussiano Pasa-Bajos, Teorema de Nyquist y Sobremuestreo Antialiasing}
-Con el fin de suprimir ruido electrónico de alta frecuencia e imperfecciones de cuantización antes de extraer características, el sistema aplica un filtro pasa-bajos gaussiano bidimensional (\texttt{src/reconocimiento/preprocesamiento/filtros.py}). Conforme al material teórico de la asignatura, la función continua de transformación gaussiana de media cero es:
+Con el fin de suprimir ruido electrónico de alta frecuencia e imperfecciones de cuantización antes de extraer características, el sistema aplica un filtro pasa-bajos gaussiano bidimensional~\cite{gonzalez2018digital} (\texttt{src/reconocimiento/preprocesamiento/filtros.py}). Conforme al material teórico de la asignatura, la función continua de transformación gaussiana de media cero es:
 \begin{equation}
 T(x, y) = \exp\!\left(-\frac{x^2 + y^2}{2\pi\sigma^2}\right),
 \label{eq:gauss_teorica}
@@ -263,7 +439,7 @@ G_{\text{inf}} &= \frac{1}{22 \cdot 63} \sum_{y=42}^{63} \sum_{x=0}^{62} \bigl|I
 \end{align}
 
 \subsection{Máscaras Binarias por Método de Otsu y Conectividad de 8 Vecinos}
-El módulo \texttt{src/reconocimiento/preprocesamiento/mascara.py} implementa la generación de máscaras faciales binarias y la segmentación topológica por componentes conexos. El umbral óptimo $t^* \in \{0,\dots,255\}$ de Otsu se obtiene maximizando la varianza inter-clase $\sigma_b^2(t)$ sobre el histograma normalizado:
+El módulo \texttt{src/reconocimiento/preprocesamiento/mascara.py} implementa la generación de máscaras faciales binarias y la segmentación topológica por componentes conexos. El umbral óptimo $t^* \in \{0,\dots,255\}$ de Otsu~\cite{otsu1979threshold} se obtiene maximizando la varianza inter-clase $\sigma_b^2(t)$ sobre el histograma normalizado:
 \begin{equation}
 t^* = \arg\max_{t \in \{0,\dots,255\}} \omega_0(t)\omega_1(t)\bigl[\mu_0(t) - \mu_1(t)\bigr]^2,
 \label{eq:otsu}
@@ -702,9 +878,163 @@ Condición & \multicolumn{2}{c}{Portal (75): FA (FAR)} & \multicolumn{2}{c}{Sesi
 }
 \end{table}
 
+
 % ==============================================================================
-\section{Conclusiones}
+\section{Reentrenamiento con Cobertura de Distancias y Diagnóstico de \texorpdfstring{\texttt{persona\_3}}{persona_3}}
 % ==============================================================================
+
+Durante las pruebas en vivo posteriores al congelamiento del candidato \textit{CNN Estándar Portal Completo} ($\tau = 0.61$) se observaron dos comportamientos no deseados: (i) \texttt{persona\_3} era clasificada en ocasiones como \texttt{persona\_1} o como \texttt{desconocido} cuando cambiaban la distancia o la cámara, y (ii) algunos desconocidos eran autorizados de forma intermitente al moverse frente a la cámara. Esta sección documenta el diagnóstico cuantitativo del primer comportamiento y el reentrenamiento efectuado con las nuevas capturas.
+
+\subsection{Diagnóstico por Condición de Captura}
+Para distinguir entre sobreajuste y falta de cobertura se evaluó el candidato congelado ($\tau = 0.61$) sobre todas las fotografías de los tres sujetos autorizados, agrupadas por la condición en que fueron tomadas: sesiones 01--03 (entrenamiento), sesión 04 (validación), sesión 05 (prueba, nunca usada para entrenar) y las sesiones de distancia (\texttt{sesion\_cercana}, \texttt{sesion\_media} y \texttt{sesion\_lejana}), capturadas después del entrenamiento de ese modelo en el caso de \texttt{persona\_3}. La Tabla~\ref{tab:diagnostico-persona3} resume las identificaciones correctas por condición.
+
+\begin{table}[H]
+\centering
+\caption{Identificaciones correctas del candidato $\tau = 0.61$ por condición de captura (correctas / fotografías con rostro detectado).}
+\label{tab:diagnostico-persona3}
+\begin{tabular}{lcccc}
+\toprule
+Identidad & Sesiones 01--03 & Sesión 04 & Sesión 05 & Sesiones de distancia \\
+\midrule
+\texttt{persona\_1} & 87/87 & 24/24 & 20/22 & 60/60$^{*}$ \\
+\texttt{persona\_2} & 59/59 & 20/20 & 18/21 & --- \\
+\texttt{persona\_3} & 60/60 & 19/20 & 20/20 & \textbf{29/62} \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\footnotesize $^{*}$ No se verificó que estas fotografías fueran independientes del entrenamiento de ese modelo.}
+\end{table}
+
+En condiciones ya conocidas, \texttt{persona\_3} se identifica casi sin errores, incluso en la sesión 05, que el modelo nunca vio ($20/20$). En las $62$ fotografías de distancia, en cambio, solo $29$ fueron correctas: $20$ se rechazaron como \texttt{desconocido}, $10$ se confundieron con \texttt{persona\_1} y $3$ con \texttt{persona\_2}, y la puerta se abrió en $34$ casos. Un modelo que hubiera memorizado sus datos fallaría también en la sesión 05; el patrón observado indica, en cambio, una \textbf{falta de cobertura} de las condiciones de captura (distancia, cámara y encuadre) y no un sobreajuste clásico.
+
+\subsection{Reentrenamiento con las Nuevas Capturas}
+Se reentrenaron los cinco clasificadores con el mismo procedimiento del candidato original (\texttt{scripts/experimentar\_4clases\_portal\_completo.py}): alineación por similitud de cinco puntos, balanceo jerárquico en dos niveles, calibración del umbral exclusivamente en validación y exclusión de la sesión 05 del entrenamiento y de la calibración. La CNN se implementó en PyTorch~\cite{paszke2019pytorch}. Cada ejecución duró entre $5$ y $9$ minutos y escribe sus resultados en una carpeta con marca de tiempo, sin sobrescribir el modelo en producción. El conjunto de \texttt{persona\_3} creció hasta $114$ fotografías de distancia procesadas. Antes del último reentrenamiento se restauraron $82$ filas de \texttt{persona\_1} que faltaban en el manifiesto local y se normalizaron todas las rutas a formato relativo, de modo que el entrenamiento sea reproducible desde cualquier copia del repositorio.
+
+La Tabla~\ref{tab:reentrenamientos} compara los modelos sobre la sesión 05 ($63$ intentos autorizados). En validación, todos los modelos reentrenados alcanzaron $\text{FRR} = 1.56\%$ ($1/64$) y $\text{FAR} = 0/107$ con el umbral que calibra el script, que resultó mayor que $0.61$.
+
+\begin{table}[H]
+\centering
+\caption{Comparación sobre la sesión 05 (identificaciones correctas por persona y puertas cerradas a autorizados).}
+\label{tab:reentrenamientos}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Modelo & Umbral & \texttt{persona\_1} & \texttt{persona\_2} & \texttt{persona\_3} & Total / cerradas \\
+\midrule
+Candidato original & $0.61$ & 20/22 & 18/21 & 20/20 & 58/63 / 0 \\
+Reentrenado 25-nov & $0.85$ & 22/22 & 18/21 & 17/20 & 57/63 / 6 \\
+Reentrenado 26-nov (A) & $0.92$ & 22/22 & 18/21 & 20/20 & 60/63 / 2 \\
+Reentrenado 26-nov (B) & $0.93$ & 22/22 & 18/21 & 20/20 & 60/63 / 3 \\
+Reentrenado final & $0.61^{\dagger}$ & 20/22 & 18/21 & 20/20 & 58/63 / 1 \\
+\bottomrule
+\end{tabular}}
+
+\smallskip
+{\footnotesize $^{\dagger}$ El script calibró este modelo en $0.73$; por decisión del equipo se evaluó con el umbral $0.61$ del candidato original. Con ese umbral no se midió la tasa de falsas aceptaciones.}
+\end{table}
+
+\subsection{Interpretación, Limitaciones y Decisión}
+\begin{itemize}
+    \item \textbf{Mejora acotada en datos independientes.} Sobre la sesión 05, los modelos reentrenados igualan o mejoran levemente al original (el original obtiene $58/63$ y el mejor reentrenado $60/63$), pero los umbrales altos cierran la puerta a más usuarios autorizados.
+    \item \textbf{Las fotografías de distancia ya no son prueba.} Tras reentrenar, \texttt{persona\_3} alcanza $62/62$, $76/76$, $83/83$ y $111/111$ en las fotografías de distancia, pero esas imágenes forman parte del entrenamiento; la mejora real solo puede comprobarse con capturas nuevas independientes.
+    \item \textbf{Confusión persistente.} Entre \texttt{persona\_2} y \texttt{persona\_1} se mantienen $3$ confusiones en $21$ intentos de la sesión 05, que el aumento de datos de \texttt{persona\_3} no corrige.
+    \item \textbf{Decisión.} Se conserva el candidato original ($\tau = 0.61$) como modelo por defecto del sistema. Los modelos reentrenados quedan como configuraciones experimentales seleccionables con la opción \texttt{--config-candidato}.
+\end{itemize}
+
+% ==============================================================================
+\section{Integración de Hardware: Indicador de Acceso con Arduino Uno}
+% ==============================================================================
+
+Para materializar de forma física el resultado del reconocimiento se integró un indicador de acceso basado en una placa Arduino Uno: cuando la puerta se abre para una persona autorizada se enciende un LED distinto para cada una de ellas, y en cualquier otro caso (desconocido, puerta cerrada o ausencia de rostro) todos los LED permanecen apagados. La integración se implementó en el módulo \texttt{src/reconocimiento/hardware/indicador\_arduino.py} y funciona tanto en la interfaz web local (puerto $5000$) como en el portal de reconocimiento remoto (puerto $5002$).
+
+\subsection{Arquitectura del Indicador}
+La Figura~\ref{fig:arquitectura-led} muestra el flujo de datos. En la web local, la decisión de puerta se calcula por fotograma en \texttt{GestorCamaraWeb}; en el portal remoto, en \texttt{ServicioPortalReconocimiento.procesar\_fotograma\_bytes}. En ambos casos se notifica al objeto \texttt{IndicadorLeds} la persona cuya puerta está abierta, o \texttt{None} en caso contrario.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    caja/.style={draw,rounded corners=2pt,align=center,minimum height=1.0cm,font=\footnotesize,fill=blue!6},
+    flecha/.style={-{Stealth[length=2mm]},thick}]
+\node[caja] (web) {Web local\\(puerto 5000)};
+\node[caja,below=1.0cm of web] (portal) {Portal remoto\\(puerto 5002)};
+\node[caja,right=1.0cm of web] (ind1) {\texttt{IndicadorLeds}\\(proceso propietario)};
+\node[caja,right=1.0cm of portal] (ind2) {\texttt{IndicadorLeds}\\(proceso cliente)};
+\node[caja,right=1.4cm of ind1,fill=orange!12] (com) {Puerto serie\\\texttt{COM3}, 9600 baudios};
+\node[caja,right=1.0cm of com,fill=green!10] (ard) {Arduino Uno\\LED en D8, D9 y D10};
+\draw[flecha] (web) -- (ind1);
+\draw[flecha] (portal) -- (ind2);
+\draw[flecha] (ind1) -- (com);
+\draw[flecha] (com) -- (ard);
+\draw[flecha,dashed] (ind2) -| node[pos=0.2,above,font=\scriptsize]{relevo UDP 127.0.0.1} (com);
+\end{tikzpicture}}
+\caption{Arquitectura del indicador LED. Solo un proceso puede abrir el puerto COM; el otro envía sus órdenes por un relevo UDP local.}
+\label{fig:arquitectura-led}
+\end{figure}
+
+Dado que el sistema operativo permite que solo un proceso abra el puerto serie, el primer proceso en arrancar abre el Arduino y levanta un servidor de relevo UDP en \texttt{127.0.0.1}; el segundo detecta que el puerto está ocupado, verifica por UDP la existencia del relevo y le envía sus órdenes. El orden de arranque es indistinto, y si no hay placa conectada el sistema continúa funcionando sin LED.
+
+\subsection{Conexión Eléctrica y Protocolo}
+Cada LED se conecta en serie con una resistencia de $220\;\Omega$ entre el pin digital y tierra (Figura~\ref{fig:cableado-led}, Tabla~\ref{tab:pines-led}). El PC envía un único byte por orden a $9600$ baudios: \texttt{0} apaga todos los LED, y \texttt{1}, \texttt{2} o \texttt{3} enciende exclusivamente el LED de \texttt{persona\_1}, \texttt{persona\_2} o \texttt{persona\_3}, respectivamente.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\small]
+\draw[thick,rounded corners=3pt,fill=teal!10] (-1.9,-2.3) rectangle (1.9,2.3);
+\node at (0,1.8) {\textbf{Arduino Uno}};
+\foreach \y/\pnm/\col/\lab in {1.0/D8/red/persona\_1, 0/D9/green/persona\_2, -1.0/D10/blue/persona\_3} {
+    \node[anchor=east,font=\scriptsize] at (1.8,\y+0.2) {\pnm};
+    \draw (1.9,\y) -- (3.0,\y);
+    \draw[fill=white] (3.0,\y-0.15) rectangle (4.3,\y+0.15);
+    \node[font=\tiny] at (3.65,\y) {220 $\Omega$};
+    \draw (4.3,\y) -- (5.2,\y);
+    \draw[fill=\col!45] (5.2,\y+0.28) -- (5.9,\y) -- (5.2,\y-0.28) -- cycle;
+    \draw (5.9,\y+0.28) -- (5.9,\y-0.28);
+    \draw (5.9,\y) -- (6.9,\y);
+    \node[anchor=west,font=\scriptsize] at (7.2,\y) {LED \lab};
+}
+\draw (6.9,1.0) -- (6.9,-2.6) -- (0,-2.6) -- (0,-2.3);
+\node[anchor=south,font=\scriptsize] at (0,-2.25) {GND};
+\end{tikzpicture}
+\caption{Cableado de los tres LED indicadores (el cátodo de cada LED se une a tierra).}
+\label{fig:cableado-led}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Asignación de pines y órdenes del protocolo serie.}
+\label{tab:pines-led}
+\begin{tabular}{lccc}
+\toprule
+Persona & Pin Arduino & Orden (byte) & Estado de los demás LED \\
+\midrule
+\texttt{persona\_1} & D8 & \texttt{1} & apagados \\
+\texttt{persona\_2} & D9 & \texttt{2} & apagados \\
+\texttt{persona\_3} & D10 & \texttt{3} & apagados \\
+Ninguna / desconocido & --- & \texttt{0} & todos apagados \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Comportamiento y Seguridad}
+\begin{itemize}
+    \item \textbf{Retención de $1$ s.} El LED permanece encendido durante un segundo tras el último reconocimiento, de modo que un fotograma aislado fallido no provoca parpadeos.
+    \item \textbf{Latido de $0.5$ s.} La orden vigente se reenvía periódicamente aunque no cambie. El sketch (\texttt{arduino/indicador\_leds/indicador\_leds.ino}) apaga todos los LED si transcurren más de $3$ s sin recibir órdenes, por lo que un cierre abrupto de la aplicación o un cable desconectado no dejan un LED encendido (comportamiento seguro ante fallos).
+    \item \textbf{Aislamiento de fallos.} Cualquier error de comunicación desactiva el indicador con un único aviso y nunca interrumpe el bucle de cámara ni la decisión de puerta.
+    \item \textbf{Detección automática.} El puerto se identifica por el fabricante (identificador de proveedor USB); en el equipo de desarrollo la placa se detectó en \texttt{COM3} (VID \texttt{0x2341}, PID \texttt{0x0043}).
+    \item \textbf{Identidad mostrada.} El LED refleja la identidad que predice el modelo; si este confunde a dos personas autorizadas, se encenderá el LED de la persona predicha.
+\end{itemize}
+
+\subsection{Verificación}
+El módulo se verificó con $17$ pruebas unitarias nuevas (\texttt{tests/test\_indicador\_arduino.py} y \texttt{tests/test\_leds\_portal\_y\_relevo.py}), que emplean un puerto serie simulado y sockets UDP reales: LED distinto por persona, apagado con desconocido o sin rostro, retención ante fotogramas fallidos, latido periódico, recuperación ante fallos de comunicación, funcionamiento del relevo e integración con el servicio del portal. Junto con las pruebas existentes de cámara, web y portal se ejecutaron $33$ pruebas, todas exitosas. La verificación con la placa física y la prueba conjunta de ambos procesos compartiendo el puerto deben registrarse durante la demostración, ya que las pruebas automatizadas no sustituyen al banco de pruebas real.
+
+
+% ==============================================================================
+\section{Conclusiones y Recomendaciones}
+% ==============================================================================
+
+\subsection{Conclusiones}
 
 \begin{enumerate}
     \item \textbf{Consolidación del Pipeline de Cuatro Fases sin Postprocesamiento:} Se demostró experimentalmente que una arquitectura bien estructurada en cuatro etapas (adquisición aislada por sesión e identidad, preprocesamiento espacial riguroso, extracción de características adaptada a cada familia algorítmica y clasificación supervisada con regla determinista de rechazo) permite operar en tiempo real ($\sim 19\;\text{ms}$ por fotograma) sin depender de etapas heurísticas de postprocesamiento.
@@ -712,6 +1042,24 @@ Condición & \multicolumn{2}{c}{Portal (75): FA (FAR)} & \multicolumn{2}{c}{Sesi
     \item \textbf{Importancia del Filtrado Espacial por Convolución y Máscaras:} La aplicación de convoluciones discretas bidimensionales con máscaras pasa-bajos gaussianas ($5 \times 5, \sigma = 0.5$) estabilizó la relación señal-ruido antes de la extracción de características, mientras que los operadores pasa-altos de acentuado (máscara $3 \times 3$ de suma nula, filtro \textit{High-Boost} y gradiente discreto $L_1$) resultaron determinantes tanto para la inspección de bordes anatómicos como para la detección temprana de oclusiones en la compuerta de calidad.
     \item \textbf{Superioridad Empírica de la CNN frente a Clasificadores Vectoriales:} En la comparación controlada sobre la partición de validación automática, la \textbf{CNN Estándar Portal Completo ($\tau = 0.61$)} superó ampliamente a Árbol de Decisión, KNN, SVM y ANN densa, alcanzando $63/64$ identificaciones correctas ($98.44\%$), $0$ confusiones entre usuarios autorizados, $\text{FRR}_{\text{puerta}} = 1.56\%$ y $\text{FAR}_{\text{global}} = 0.00\%$ ($0/107$), además de lograr $58/63$ ($92.06\%$, $0$ bloqueos) en la prueba histórica \texttt{sesion\_05} y validar en vivo desde el portal remoto a \texttt{persona\_1} ($97.3\%\text{--}99.0\%$) y \texttt{persona\_2} ($93.5\%$) rechazando correctamente a los sujetos desconocidos.
     \item \textbf{Mitigación de Degradaciones Físicas en Conjunto Abierto:} El diagnóstico del espacio latente de $128$ dimensiones demostró que las falsas aceptaciones observadas inicialmente con el candidato de umbral $0.52$ provenían de la asimetría de peso individual ($1/320$) y de perturbaciones fuera de distribución (oscuridad y oclusión inferior). La promoción de la \textbf{CNN Estándar ($\tau = 0.61$)} como modelo predeterminado, complementada opcionalmente con la compuerta de calidad de Fase 1 ($0.00\%$ FAR en oscuridad y oclusión inferior sin reentrenar) y el modelo experimental de Fase 2 ($\tau = 0.62$, $0.00\%$ FAR en oscuridad y contraluz), dota al sistema de una arquitectura verificada, trazable y segura para su demostración final.
+    \item \textbf{Cobertura de condiciones frente a sobreajuste:} El diagnóstico por condición de captura mostró que el candidato $\tau = 0.61$ identifica a \texttt{persona\_3} casi sin errores en condiciones ya vistas ($60/60$ y $20/20$ en la sesión 05), pero solo $29/62$ en distancias nuevas; la causa principal es la falta de cobertura de esas condiciones, no la memorización de los datos.
+    \item \textbf{Reentrenamiento sin regresión comprobable:} Con las sesiones de distancia los modelos reentrenados igualan o mejoran levemente al original en la sesión 05 ($58/63$ a $60/63$), pero con umbrales altos bloquean a más usuarios autorizados; por ello se conserva $\tau = 0.61$ como modelo por defecto y los nuevos quedan como alternativas experimentales.
+    \item \textbf{Indicador físico de acceso:} Se integró un indicador LED en Arduino Uno que refleja a quién se le abre la puerta, compartido entre la interfaz local y el portal remoto mediante un relevo UDP, con apagado seguro ante fallos y verificado mediante pruebas automatizadas.
 \end{enumerate}
+
+\subsection{Recomendaciones}
+
+\begin{itemize}
+    \item \textbf{Capturas independientes para evaluar.} Tomar nuevas sesiones de \texttt{persona\_2} y \texttt{persona\_3} en las condiciones reales de uso (misma cámara, luz y distancia) y reservarlas exclusivamente para prueba, pues las fotografías actuales ya forman parte del entrenamiento.
+    \item \textbf{Filtro de estabilidad temporal (propuesta no implementada).} Decidir la apertura sobre una ventana deslizante de aproximadamente $1$ s ($\approx 14$ fotogramas) con un contador ascendente/descendente: cada fotograma de la persona autorizada suma y cada fotograma \texttt{desconocido} resta, de modo que el parpadeo entre \texttt{persona\_3} y \texttt{desconocido} al moverse no reinicie la cuenta, pero un intruso con fotogramas mayoritariamente \texttt{desconocido} no acumule evidencia. Debe acompañarse de una retención de apertura de $2$ a $3$ s y de una medición por intento sobre clips de video, porque los errores de fotogramas consecutivos están correlacionados y el filtro no corrige confusiones sistemáticas.
+    \item \textbf{Medir las falsas aceptaciones con el umbral elegido.} Si se desea operar un modelo reentrenado con $\tau = 0.61$, medir antes la tasa de falsas aceptaciones sobre desconocidos, que solo se verificó con el umbral calibrado.
+    \item \textbf{Representaciones de embeddings.} La sustitución de la clase \texttt{desconocido} por una decisión basada en distancias entre vectores característicos (con pérdidas como ArcFace~\cite{deng2019arcface} o tripletes~\cite{schroff2015facenet}) eliminaría la dependencia de fotografías de desconocidos, pero con tres identidades autorizadas exige un modelo preentrenado; debe confirmarse con la cátedra si esto es admisible, dado que el requisito es entrenar el modelo propio.
+\end{itemize}
+
+% ==============================================================================
+% REFERENCIAS
+% ==============================================================================
+
+\printbibliography[heading=bibintoc, title={Referencias Bibliográficas}]
 
 \end{document}
