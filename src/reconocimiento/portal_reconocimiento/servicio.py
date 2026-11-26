@@ -36,6 +36,26 @@ CANDIDATOS_PORTAL: Dict[str, Dict[str, str]] = {
         "nombre": "CNN Antialiasing — 0.52",
         "ruta_config": "configuracion_candidato_antialiasing_052.json",
     },
+    "cnn_distancias_20261125_085": {
+        "nombre": "CNN 4 Clases + Distancias (25-nov) — 0.85",
+        "ruta_config": "configuracion_candidato_distancias_20261125.json",
+    },
+    "cnn_distancias_20261125_calidad_085": {
+        "nombre": "CNN 4 Clases + Distancias + Calidad — 0.85",
+        "ruta_config": "configuracion_candidato_distancias_20261125_calidad.json",
+    },
+    "cnn_distancias_20261126_092": {
+        "nombre": "CNN 4 Clases + Distancias (26-nov) — 0.92",
+        "ruta_config": "configuracion_candidato_distancias_20261126.json",
+    },
+    "cnn_distancias_20261126b_093": {
+        "nombre": "CNN 4 Clases + Distancias (26-nov, 2) — 0.93",
+        "ruta_config": "configuracion_candidato_distancias_20261126b.json",
+    },
+    "cnn_distancias_umbral061": {
+        "nombre": "CNN 4 Clases + Distancias (nuevo) — 0.61",
+        "ruta_config": "configuracion_candidato_distancias_umbral061.json",
+    },
 }
 
 CATEGORIAS_REALES_VALIDAS = frozenset({"persona_1", "persona_2", "persona_3", "desconocido"})

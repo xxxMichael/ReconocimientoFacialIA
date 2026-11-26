@@ -1,21 +1,4 @@
-"""
-Implementación de Red Neuronal Convolucional (CNN) para reconocimiento facial.
-Basada en el principio de aprendizaje jerárquico de representaciones espaciales:
-- Entrada espacial directa: Rostros en escala de grises de 64 x 64 píxeles (rango [0.0, 1.0]).
-- Arquitectura compacta adaptada a N_train = 240 (6 imágenes por identidad):
-  * Bloque 1: Conv2d(1, 16, 3, pad=1) -> BatchNorm2d(16) -> ReLU -> MaxPool2d(2, 2) [Salida: 16 x 32 x 32]
-  * Bloque 2: Conv2d(16, 32, 3, pad=1) -> BatchNorm2d(32) -> ReLU -> MaxPool2d(2, 2) [Salida: 32 x 16 x 16]
-  * Bloque 3: Conv2d(32, 64, 3, pad=1) -> BatchNorm2d(64) -> ReLU -> MaxPool2d(2, 2) [Salida: 64 x 8 x 8 = 4096]
-  * Clasificador Denso: Aplanar -> Linear(4096, 128) -> ReLU -> Dropout(0.35) -> Linear(128, 40)
-- Jerarquía de características aprendidas:
-  1. Filtros convolucionales iniciales: detección de bordes, líneas y texturas locales de piel.
-  2. Filtros intermedios: partes faciales (ojos, cejas, tabique nasal, boca).
-  3. Filtros profundos: combinaciones globales y relaciones métricas entre rasgos.
-  4. Capas densas: discriminación de identidad sobre el espacio latente.
-- Contraste con características del grupo:
-  Mientras que KNN, Árbol, SVM y ANN emplean los histogramas regionales fijos (4x4, 16 bins),
-  la CNN aprende sus propios filtros espaciales directamente de la matriz de píxeles normalizada.
-"""
+
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple

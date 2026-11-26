@@ -1,9 +1,3 @@
-"""
-Pipeline unificado para el candidato congelado de 4 clases.
-Garantiza que el evaluador final independiente y la interfaz web en vivo
-utilicen exactamente el mismo cargador, detector YuNet, preprocesamiento,
-inferencia de red neuronal y regla de decisión de acceso físico.
-"""
 from dataclasses import dataclass
 import hashlib
 import json
